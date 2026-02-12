@@ -1,0 +1,23 @@
+# Credentials and secrets
+.credentials.json
+
+# Transient caches and state
+cache/
+debug/
+file-history/
+paste-cache/
+plans/
+plugins/
+projects/
+session-env/
+shell-snapshots/
+statsig/
+tasks/
+todos/
+
+# Session data
+history.jsonl
+stats-cache.json
+
+# Settings are machine-specific
+settings.json
