@@ -645,8 +645,8 @@ Source: `modules/Thread/module.jai`
 #assert(cond);                          // parenthesized form
 #assert cond;                           // bare form
 #assert cond "message";                 // with message (NO comma, space-separated)
-#insert expr;                           // code insertion
-#insert,scope() expr;                  // with scope
+#insert expr;                           // code insertion (string: resolves in textual scope)
+#insert,scope() expr;                  // with scope (Code: inherits caller scope; string: still textual scope)
 #insert(break=break outer) expr;       // with break parameter mapping
 #insert(remove=#assert(false)) expr;   // with remove parameter
 #insert(break=break slot, remove={stmt; stmt;}) expr;  // combined break + remove
@@ -819,6 +819,98 @@ f :: ($c: Code) -> u32 {
 // For non-constant Code, use get_root_type(c) from modules/Compiler
 // #code,typed ensures the code is resolved locally so get_root_type works
 // Source: examples/code_type.jai (detailed example)
+```
+
+### Compile-Time AST Rewriting (#code + compiler_get_nodes + #insert)
+<!-- verified: beta 0.2.026, from how_to/630_compiler_get_nodes.jai -->
+```jai
+// Pattern: Walk/modify AST captured with #code, then #insert the result.
+// Requires: #import "Compiler";
+//
+// compiler_get_nodes returns a FRESH COPY of the AST (safe to mutate).
+// 'expressions' is a flat list of ALL sub-nodes in the tree.
+// Source: how_to/630_compiler_get_nodes.jai
+
+// --- AST modification pattern (modify nodes in-place, re-emit as Code) ---
+my_macro :: (c: Code) #expand {
+    transform :: (code: Code) -> Code {
+        root, expressions := compiler_get_nodes(code);
+        for expressions {
+            if it.kind != .LITERAL continue;
+            literal := cast(*Code_Literal) it;
+            if literal.value_type != .STRING continue;
+            literal._string = modify_string(literal._string);  // mutate in-place
+        }
+        return compiler_get_code(root);  // convert modified AST back to Code
+    }
+    modified :: #run transform(c);
+    #insert,scope() modified;  // ,scope() inherits caller's scope
+}
+
+// --- String generation pattern (walk AST, generate new code as string) ---
+// More flexible than AST modification: can inject new identifiers, rewrite
+// call signatures, add validation. The generated string is compiled when inserted.
+//
+// CROSS-MODULE SCOPING: When an #expand macro lives in a module, #insert of a
+// generated string resolves identifiers in the MODULE's scope — both #insert and
+// #insert,scope() behave this way for strings. To reference caller-defined names
+// (types, functions), use backtick-prefixed identifiers (`Name) in the generated
+// string. Backtick identifiers resolve in the caller's scope, same mechanism as
+// `it, `it_index, `break in for-expansion macros.
+//
+// Module-defined names (exported types, internal functions) don't need backticks.
+//
+// Example: generated string for cross-module override validation:
+//   _overrides := Override.[
+//       make_internal(`CallerStruct, "field", `caller_write_fn),  // backtick = caller scope
+//   ];
+//
+// DEBUGGING: The compiler writes all #insert-ed strings to .build/.added_strings_wN.jai
+// (hidden file, dot-prefixed). Inspect this to see exactly what was generated and inserted.
+// The file shows each insert with its source location and the full generated text.
+//
+my_macro2 :: (row: *$T, override_code: Code = #code .[]) #expand {
+    generate :: (code: Code, struct_ti: *Type_Info) -> string {
+        si := cast(*Type_Info_Struct) struct_ti;
+        root, expressions := compiler_get_nodes(code);
+        sb: String_Builder;
+        for expressions {
+            if it.kind != .PROCEDURE_CALL continue;
+            call := cast(*Code_Procedure_Call) it;
+            if call.procedure_expression.kind != .IDENT continue;
+            ident := cast(*Code_Ident) call.procedure_expression;
+            if ident.name != "target_fn" continue;
+            // Extract args, validate, generate new code string...
+            args := call.arguments_unsorted;  // [] Code_Argument
+            arg_expr := args[0].expression;   // *Code_Node
+            // Backtick caller-scope names, no backtick for module-scope names:
+            // print_to_builder(*sb, "rewritten_fn(`%, \"%\", `%),\n",
+            //     si.name, field_name, fn_ident.name);
+        }
+        return builder_to_string(*sb);
+    }
+    _gen :: #run generate(override_code, type_info(T));
+    #insert,scope() _gen;  // variables declared here are available below
+}
+
+// Key Compiler AST types:
+// Code_Node        — base; .kind is Code_Node.Kind enum
+// Code_Node.Kind   — .LITERAL, .IDENT, .PROCEDURE_CALL, .BLOCK, .DECLARATION, ...
+// Code_Procedure_Call — .procedure_expression (*Code_Node), .arguments_unsorted ([] Code_Argument)
+// Code_Argument    — .expression (*Code_Node), .name (*Code_Ident, null if positional)
+// Code_Ident       — .name (string), .resolved_declaration (*Code_Declaration)
+// Code_Literal     — .value_type (.STRING, .NUMBER, .ARRAY, .STRUCT, ...), ._string, ._s64, etc.
+// Code_Array_Literal_Info — .array_members ([] *Code_Node)
+//
+// compiler_get_nodes :: (code: Code) -> (root: *Code_Node, expressions: [] *Code_Node) #compiler;
+// compiler_get_code  :: (node: *Code_Node, ...) -> Code #compiler;
+// compiler_report    :: (message: string, loc := #caller_location, mode := Report.ERROR) #compiler;
+//   Report :: enum u8 { ERROR; WARNING; INFO; }  // from #import "Compiler"
+//
+// #code delays name resolution — identifiers don't need to exist until #insert.
+// This enables "phantom function" patterns: user writes make_foo("x", fn) in #code,
+// macro rewrites to make_foo_internal(StructType, "x", fn) via string generation.
+// Two-phase validation: AST walk validates structure, polymorph #assert validates types.
 ```
 
 ### Metaprogramming Directives
