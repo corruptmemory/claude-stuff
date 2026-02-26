@@ -1,11 +1,11 @@
 // Compendium: Advanced Operators & Special Syntax
-// Jai Version: beta 0.2.025
+// Jai Version: beta 0.2.026
 // Platform: Linux x86-64
 // Sources: modules/md5.jai, modules/xxHash/module.jai, modules/Bindings_Generator/restart.jai,
 //          modules/Thread/module.jai, modules/Hash.jai
-// Use-cases: rotate operators (<<<, >>>), prefix dereference (<<),
+// Use-cases: rotate operators (<<<, >>>), postfix dereference (.*),
 //   operator as value reference, loop-body directives (#no_abc, #no_aoc)
-// Compiled: yes (jai-linux, 2026-02-13)
+// Compiled: yes (jai-linux, 2026-02-21)
 
 #import "Basic";
 
@@ -19,15 +19,16 @@ rotate_demo :: () {
     print("<<< = 0x%, >>> = 0x%\n", formatInt(left, base=16), formatInt(right, base=16));
 }
 
-// === Prefix dereference << ===
-// << as prefix operator dereferences a pointer (equivalent to ptr.*)
+// === Postfix dereference .* ===
+// .* as postfix operator dereferences a pointer; use (.*) in prefix position
+// Note: << prefix dereference was deprecated in 0.2.026
 // Source: modules/Bindings_Generator/restart.jai line 43
 prefix_deref_demo :: () {
     x := 42;
     ptr := *x;
     pptr := *ptr;
-    val := <<pptr;  // prefix dereference (double pointer → value)
-    print("<<pptr = %\n", val);
+    val := pptr.*;   // postfix dereference (double pointer → value)
+    print("pptr.* = %\n", val);
 }
 
 // === Loop-body directives #no_abc #no_aoc ===
