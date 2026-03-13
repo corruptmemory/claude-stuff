@@ -21,6 +21,11 @@ stats-cache.json
 
 # Settings are machine-specific
 settings.json
+.claude/
+
+# Runtime caches
+mcp-needs-auth-cache.json
+telemetry/
 
 # Build artifacts from Jai compendium (compiled ELF binaries + object files)
 skills/jai-language/compendium/.build/
