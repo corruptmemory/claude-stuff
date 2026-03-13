@@ -24,6 +24,7 @@ settings.json
 .claude/
 
 # Runtime caches
+image-cache/
 mcp-needs-auth-cache.json
 telemetry/
 
