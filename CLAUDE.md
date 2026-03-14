@@ -126,9 +126,33 @@ The `mcp__*` wildcard in global `settings.json` does NOT actually suppress promp
 
 Tool names follow the pattern `mcp__plugin_<pluginname>_<servername>__<toolname>`. If a new plugin shows up and prompts, enumerate its tools the same way.
 
+## glab (GitLab CLI) Quick Reference
+
+`glab` v1.88+ is installed. Key flags that differ from `gh` (GitHub CLI):
+
+```bash
+# Create a merge request (non-interactive):
+glab mr create \
+  --title "Title here" \
+  --description "Body here" \    # NOT --body (that's gh)
+  --target-branch main \
+  --yes                          # -y skips confirmation prompt (REQUIRED for non-interactive use)
+
+# --fill uses commit message as title/description (skips prompts, auto-pushes)
+glab mr create --fill --yes
+
+# --recover retries from a saved recovery file but still needs --title or --fill
+```
+
+**Common mistakes to avoid:**
+- `--body` does not exist — use `--description` (`-d`)
+- Without `--yes`, glab drops into an interactive prompt that hangs in non-interactive contexts
+- `--repo` accepts `OWNER/REPO` or `GROUP/NAMESPACE/REPO` format, NOT a full `https://` URL
+- Auth token can expire silently — check with `glab auth status` before blaming flag syntax
+
 ## General Preferences
 
 - Format Go with `gofmt`
-- Prefer CLI flags and TOML config over environment variables
+- **CLI arguments over environment variables** — environment variables are the devil because there's no tooling to ask an arbitrary program "what environment variables do you look at?" Any sane CLI-driven program can tell you what arguments it accepts. Use CLI flags with sensible (or sensibly derived) defaults. It's fine to reach into a shared TOML config for values that are too cumbersome for a CLI invocation, but the config file path itself should be a CLI flag.
 - Keep things simple — no over-abstraction, no unnecessary dependencies
 - Tests should be straightforward table-driven or sequential, using `t.TempDir()` for isolation
