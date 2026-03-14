@@ -106,19 +106,7 @@ The `mcp__*` wildcard in global `settings.json` does NOT actually suppress promp
       "mcp__plugin_serena_serena__prepare_for_new_conversation",
       "mcp__plugin_serena_serena__initial_instructions",
       "mcp__plugin_context7_context7__resolve-library-id",
-      "mcp__plugin_context7_context7__query-docs",
-      "mcp__plugin_greptile_greptile__list_custom_context",
-      "mcp__plugin_greptile_greptile__get_custom_context",
-      "mcp__plugin_greptile_greptile__search_custom_context",
-      "mcp__plugin_greptile_greptile__list_merge_requests",
-      "mcp__plugin_greptile_greptile__list_pull_requests",
-      "mcp__plugin_greptile_greptile__get_merge_request",
-      "mcp__plugin_greptile_greptile__list_merge_request_comments",
-      "mcp__plugin_greptile_greptile__list_code_reviews",
-      "mcp__plugin_greptile_greptile__get_code_review",
-      "mcp__plugin_greptile_greptile__trigger_code_review",
-      "mcp__plugin_greptile_greptile__search_greptile_comments",
-      "mcp__plugin_greptile_greptile__create_custom_context"
+      "mcp__plugin_context7_context7__query-docs"
     ]
   }
 }
