@@ -1,17 +1,28 @@
 ---
 name: actor-pattern
-description: "Apply the Go goroutine actor pattern for thread-safe state management. Use when: (1) multiple HTTP handlers need shared mutable state, (2) replacing mutex-locked structs or atomic.Pointer patterns, (3) building a service layer that owns in-memory state plus persistence, (4) application has distinct operational modes (setup, running, error) requiring a coordinator that manages sub-actors, (5) the user mentions 'actor pattern', 'goroutine event loop', 'channel-based state management', or 'actors managing actors'."
+description: "Apply the actor pattern for thread-safe state management. Use when: (1) multiple threads/goroutines need shared mutable state, (2) replacing mutex-locked structs or atomic patterns, (3) building a service layer that owns in-memory state plus persistence, (4) application has distinct operational modes (setup, running, error) requiring a coordinator that manages sub-actors, (5) the user mentions 'actor pattern', 'goroutine event loop', 'channel-based state management', or 'actors managing actors'. Supports Go, Jai, C, Rust, Odin, and Zig."
 ---
 
-# Go Goroutine Actor Pattern
+# Actor Pattern
 
-Replace locks and atomic pointers with a single goroutine that owns all mutable state, accessed via channel-based request/response.
+Replace locks and atomics with a single thread/goroutine that owns all mutable state, accessed via channel-based request/response.
+
+## Why This Should Be a First-Reach Tool
+
+This pattern is **language-agnostic and highly portable**. It has been implemented and verified across Go, Jai, C, Rust, Odin, and Zig — and the translation between any two is mechanical. Consider it early in design decisions involving concurrent state access, before reaching for mutexes or atomics.
+
+The only building block is a bounded blocking queue (channel). Languages split into three tiers:
+- **First-class channels** (Go, Odin): the pattern maps 1:1, including `select` for multiplexing.
+- **Typed channels, no select** (Rust `std::sync::mpsc`, Jai): shutdown uses channel close semantics instead of select. One-shot reply channels (Rust) or reply pointers + done channels (Jai) handle the response path.
+- **No channels** (C, Zig): a channel is just mutex + 2 condition variables + ring buffer — 75–100 lines. The abstraction is thin sugar over universal OS primitives.
+
+The actor pattern itself never changes. The only thing that varies is how you spell "send a tagged message and block for the reply." Any language with threads and a mutex can do this.
 
 ## When to Apply
 
 **Single actor:**
-- Multiple goroutines (HTTP handlers, background jobs) need to read/write shared state
-- Current code uses `sync.Mutex` or `atomic.Pointer` to protect state
+- Multiple threads (HTTP handlers, background jobs) need to read/write shared state
+- Current code uses mutexes or atomics to protect state
 - You need a service that combines in-memory caching with persistent storage
 
 **Actor hierarchy (coordinator + sub-actors):**
@@ -19,28 +30,37 @@ Replace locks and atomic pointers with a single goroutine that owns all mutable 
 - Sub-actors need to trigger their own replacement (e.g., setup → running)
 - You need graceful error recovery with fallback chains
 
-## Pattern Overview
+## References & Runnable Examples
 
-See [references/pattern.md](references/pattern.md) for the complete implementation reference with code templates. Covers both single actors and actor hierarchies.
+Each compendium has 4 examples: basic counter, KV store, polling, actor hierarchy.
+
+| Language | Compendium | Channel Source | Build |
+|----------|-----------|----------------|-------|
+| **Go** | [go-compendium/](go-compendium/) | `chanutil/` (generic helpers) | `go run ./01_basic_actor` |
+| **Jai** | [jai-compendium/](jai-compendium/) | vendored `channel` module | `~/jai/jai/bin/jai-linux first.jai - 01` |
+| **C** | [c-compendium/](c-compendium/) | `channel.h`/`channel.c` (custom) | `make all` |
+| **Rust** | [rust-compendium/](rust-compendium/) | `std::sync::mpsc` (stdlib) | `cargo run --bin 01_basic_actor` |
+| **Odin** | [odin-compendium/](odin-compendium/) | `core:sync/chan` (stdlib) | `odin run 01_basic_actor` |
+| **Zig** | [zig-compendium/](zig-compendium/) | `channel.zig` (custom) | `zig build-exe 01_basic_actor.zig` |
+
+**Go detailed reference:** [references/go-patterns.md](references/go-patterns.md) — complete code templates and design principles.
 
 ## Implementation Steps — Single Actor
 
-1. Create `internal/chanutil/chanutil.go` with generic channel helpers
-2. Define the public **interface** (what callers see)
-3. Define **command tags** (enum of operations)
-4. Define the **command struct** with a `result chan any` and `WithResult` method
-5. Implement the **unexported struct** with `commands chan`, `sync.WaitGroup`
-6. Write the **`run()` goroutine** — single `for msg := range commands` loop owning all state
-7. Write **public methods** that use `SendReceive` / `SendReceiveError` to talk to the goroutine
-8. Wire **`Stop()` / `Wait()`** for clean shutdown
-9. Update callers (HTTP handlers, main.go) to use the new interface
+1. Define the public **interface** (what callers see)
+2. Define **command tags** (enum of operations)
+3. Define the **command struct** with payload fields and a result/reply mechanism
+4. Implement the **actor struct** with a command channel and dispatch thread
+5. Write the **dispatch loop** — single `for/while` loop owning all mutable state as locals
+6. Write **public methods** that send commands and block for results
+7. Wire **shutdown** — close the command channel; dispatch loop exits
 
 ## Implementation Steps — Actor Hierarchy
 
-1. Define **`Stoppable`** interface (`Stop()` + `Wait()`) and **`StateBuilder`** function type
-2. Build the **coordinator actor** (Application) that owns one sub-actor at a time
-3. Make **`SetState` fire-and-forget** — never synchronous, or you get deadlocks
-4. Define **`RecoverableError`** for fallback chains; **`buildState`** tries builder → recovery → ErrorApp
-5. Build each **sub-actor** (SetupApp, RunningApp, ErrorApp) implementing Stoppable
-6. Sub-actors receive coordinator pointer; call `app.SetState(nextBuilder)` to trigger transitions
-7. HTTP handlers **type-switch** on the current sub-actor to decide what to render
+1. Define **Stoppable** interface and **StateBuilder** function type
+2. Build the **coordinator** that owns one sub-actor at a time
+3. Make **SetState fire-and-forget** — never synchronous, or you get deadlocks
+4. Define **RecoverableError** for fallback chains; terminal ErrorApp as backstop
+5. Build each **sub-actor** implementing Stoppable
+6. Sub-actors receive coordinator pointer; call `SetState(nextBuilder)` to trigger transitions
+7. Callers **type-switch** on the current sub-actor to decide behavior

@@ -138,6 +138,16 @@ glab mr create --fill --yes
 - `--repo` accepts `OWNER/REPO` or `GROUP/NAMESPACE/REPO` format, NOT a full `https://` URL
 - Auth token can expire silently — check with `glab auth status` before blaming flag syntax
 
+## Available CLI Tools
+
+These tools are installed on all machines and can be used freely:
+
+- **`gh`** — GitHub CLI
+- **`glab`** — GitLab CLI
+- **`npx @playwright/mcp@latest`** — Playwright CLI
+- **`az`** — Azure CLI
+- **`aws`** — AWS CLI
+
 ## General Preferences
 
 - Format Go with `gofmt`

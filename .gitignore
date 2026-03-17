@@ -33,5 +33,24 @@ skills/jai-language/compendium/.build/
 skills/jai-language/compendium/[0-9][0-9]_*
 !skills/jai-language/compendium/[0-9][0-9]_*.jai
 
+# Build artifacts from actor-pattern compendiums
+skills/actor-pattern/jai-compendium/.build/
+skills/actor-pattern/jai-compendium/build/
+skills/actor-pattern/c-compendium/01
+skills/actor-pattern/c-compendium/02
+skills/actor-pattern/c-compendium/03
+skills/actor-pattern/c-compendium/04
+skills/actor-pattern/go-compendium/.build/
+skills/actor-pattern/rust-compendium/target/
+skills/actor-pattern/odin-compendium/build/
+skills/actor-pattern/zig-compendium/01_basic_actor
+skills/actor-pattern/zig-compendium/02_request_response
+skills/actor-pattern/zig-compendium/03_polling
+skills/actor-pattern/zig-compendium/04_actor_hierarchy
+skills/actor-pattern/zig-compendium/.zig-cache/
+
+# Session files
+sessions/
+
 # Backups
 backups/
