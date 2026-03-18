@@ -738,3 +738,61 @@ These principles apply broadly to Go library design but are especially important
 **Cached vs. side-effecting queries.** Some commands just return state the actor already holds (cheap, no I/O). Others trigger work — API calls, reconciliation, recomputation — before returning fresh state. Expose both via separate public methods. The cached path serves frequent/automatic callers (SSE-triggered refreshes, initial page loads), while the side-effecting path serves explicit user actions (a "Refresh" button). Same return type, different command tags. Example: `GetMRData()` returns stashed MR lists instantly; `RefreshMRs()` calls the upstream API, updates internal state, then returns.
 
 **Blocking in the actor loop is a trade-off, not a bug.** When a command handler makes a network call (API fetch, ancestry check), it blocks the entire actor for the duration. This is acceptable when: (1) the trigger is infrequent (HEAD changes, explicit user refresh), (2) no other commands need low latency during that window, and (3) the alternative — spawning a goroutine for the work — would require complex synchronization to update actor-owned state safely. But if the blocking work is frequent or user-initiated with unpredictable latency (like git commit+push), isolate it in a dedicated actor (e.g., CartActor) so the main actor stays responsive.
+
+## Actor-to-Actor Communication via Subscriptions
+
+When one actor needs to react to another actor's events, use the subscription pattern: `ActorA.Subscribe()` returns a `Subscription[T]` with an `Events() <-chan T` method. ActorB reads from that channel in its own `select` loop.
+
+```go
+// ActorB's run loop watches both its own commands AND ActorA's events:
+func (b *ActorB) run() {
+    syncEvents := b.syncSubscription.Events() // from ActorA
+    for {
+        select {
+        case evt, ok := <-syncEvents:
+            if !ok { syncEvents = nil; continue }
+            // React to ActorA's events
+            if evt.Type == SETDone { b.handleSyncDone() }
+        case cmd, ok := <-b.cmds:
+            if !ok { return }
+            cmd.execute(b.db)
+        }
+    }
+}
+```
+
+**Fan-in pattern.** A third actor (EventActor) subscribes to multiple actors and merges their event streams into a unified output. SSE clients subscribe to the fan-in actor, seeing a single ordered stream. The fan-in actor's `run()` loop is just a `select` on all input channels plus its own command channel (for subscribe/unsubscribe requests).
+
+**No callbacks.** Callbacks cross concurrency boundaries invisibly — the caller has no idea what goroutine context the callback runs in. Channels make the boundary explicit and enforced.
+
+## The Decompression Pattern
+
+When an actor needs to do long-running work that itself requires sending commands back through its own channel (e.g., a reindex that calls `actor.IncrementalScan()` → sends command → waits for response), running the work synchronously in the `run()` loop deadlocks: the loop is blocked in the work function, unable to process the very commands the work function is waiting on.
+
+**Solution:** Launch the work in a goroutine. The goroutine sends commands to the actor's channel and blocks on each response. Meanwhile, the `run()` loop keeps processing all commands — both the work function's commands and any other commands (HTTP handler queries, etc.). The long-running operation's commands interleave with regular traffic.
+
+```go
+func (a *IndexActor) doReindex() {
+    a.broadcaster.Broadcast(IndexEvent{IETReindexProgress, "Rebuilding..."})
+    go func() {
+        // This calls a.IncrementalScan() which sends commands to a.cmds
+        // and blocks for each response. The run() loop processes them
+        // interleaved with any other commands.
+        count, err := a.reindexFn(a.maildirRoot, a)
+        // Send completion event back through the command channel
+        a.cmds <- &indexEventCmd{IndexEvent{IETReindexDone, fmt.Sprintf("Indexed %d", count)}}
+    }()
+}
+```
+
+The goroutine is a "pressure source" — it pushes commands into the channel and yields control between each one. The actor processes them at its own pace alongside everything else. Users querying mail during a reindex see no latency because their commands slip into the gaps between scan operations.
+
+**Key invariant:** the goroutine never touches the actor's owned state directly. It only communicates via the command channel. The actor remains the sole owner of mutable state.
+
+## Value Safety: Returning Immutable Copies
+
+The actor guarantees *access serialization* (only one goroutine touches state at a time) but not *value safety*. If a command handler returns a pointer to internal state, the caller can mutate it from another goroutine — the channel delivered the pointer safely, but shared mutable state leaked right back.
+
+**Rule:** Every result sent back through a response channel must be an immutable copy. In Go, this means returning structs (value types), freshly-allocated slices, and freshly-populated maps — never pointers to internal state, never internal slices.
+
+**Corollary for inputs:** Once you send a mutable value (slice, map) into an actor via a command, don't modify it from the caller's goroutine. In practice, this is easy because the caller typically blocks on the response channel until the command completes.
