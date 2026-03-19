@@ -372,3 +372,16 @@ The tests are **testing business logic**, not mock plumbing. The mock is invisib
 **Mock at the boundary, not everywhere.** Mock databases, external APIs, clocks, random number generators. Don't mock your own business logic — test it directly through the interface.
 
 **Each mock is bespoke.** Build the observation hooks you need for the tests you're writing. A slice of recorded calls here, a counter there, a channel for async verification somewhere else. No universal mock recorder — the freight costs exceed the value.
+
+**Compose read/write interfaces for transactional stores.** When a store has both reads and writes, split the interfaces and compose:
+
+```go
+type ReadOps interface { GetFoo(id int64) (*Foo, error) }
+type WriteOps interface { CreateFoo(f *Foo) error }
+type WriteTx interface { ReadOps; WriteOps }  // reads + writes inside tx
+type Store interface { ReadOps; Update(func(WriteTx) error) error; Close() error }
+```
+
+Reads go directly on the store (no transaction needed for WAL-mode SQLite or read replicas). Writes always go through `Update`. The `WriteTx` embeds `ReadOps` because writes often need to read-modify-write atomically. Callers can't accidentally bypass the transaction boundary — the type system enforces it.
+
+**The Sausage Theorem.** Problems have a minimum amount of complexity. Extracting an interface doesn't reduce total lines — it moves them. The value is that each piece now has a single responsibility: the interface defines the contract, the real implementation handles persistence, the fake records calls for tests, and the consumer (actor, handler) handles orchestration. Same meat, better slicing.

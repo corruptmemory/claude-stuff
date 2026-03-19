@@ -796,3 +796,61 @@ The actor guarantees *access serialization* (only one goroutine touches state at
 **Rule:** Every result sent back through a response channel must be an immutable copy. In Go, this means returning structs (value types), freshly-allocated slices, and freshly-populated maps — never pointers to internal state, never internal slices.
 
 **Corollary for inputs:** Once you send a mutable value (slice, map) into an actor via a command, don't modify it from the caller's goroutine. In practice, this is easy because the caller typically blocks on the response channel until the command completes.
+
+## Command Pattern vs. Tagged Messages (Akka Style)
+
+**Command pattern** (Java-influenced): Each operation is a separate struct implementing an `execute(state)` interface method. The actor's `run()` loop is opaque — just `cmd.execute(state)`. The logic is scattered across dozens of struct types defined far from the dispatch loop.
+
+**Tagged messages** (Akka-influenced): A single command struct with a tag enum and union-style payload fields. The actor's `run()` loop is a `switch` on the tag. All dispatch logic is visible in one function.
+
+**Prefer tagged messages.** The `run()` function is longer but *complete* — you can read what the actor does without chasing definitions across files. The command pattern hides behavior behind an interface, making the actor's `run()` a black box.
+
+**The `doReply` helper** eliminates dispatch boilerplate. Go's standard `(value, error)` return pattern maps directly:
+
+```go
+func doReply[T any](result chan any) func(value T, err error) {
+    return func(value T, err error) {
+        if err != nil {
+            result <- err
+        } else {
+            result <- value
+        }
+    }
+}
+
+// Usage — one-liners for single-return-value dispatch:
+case idxGetMessage:
+    doReply[*MessageDetail](cmd.result)(a.store.GetMessage(cmd.id))
+case idxGetFolders:
+    doReply[[]FolderInfo](cmd.result)(a.store.GetFolders())
+
+// Multi-value returns pack into a result struct first:
+case idxQuery:
+    msgs, total, err := a.store.Query(...)
+    doReply[queryResult](cmd.result)(queryResult{msgs, total}, err)
+
+// Error-only writes don't need doReply:
+case idxDeleteMessage:
+    cmd.result <- a.store.Update(func(tx WriteTx) error {
+        return tx.DeleteMessage(cmd.id)
+    })
+```
+
+## Separating Storage from Actor (Interface-First)
+
+The actor should NOT embed database logic. Extract storage behind an interface:
+
+```go
+type Store interface {
+    ReadOps
+    Update(fn func(tx WriteTx) error) error
+    Close() error
+}
+```
+
+Two implementations: real (SQLite/Postgres/etc.) and fake (recording mock for tests). The actor holds a `Store` instance and delegates all data operations to it. The actor's `run()` loop handles concurrency, event reactions, and subscription management — not SQL queries.
+
+This separation enables:
+- **Independent store tests**: validate SQL correctness with real database, no actor needed
+- **Independent actor tests**: verify delegation, lifecycle, event reactions with fake store
+- **The Sausage Theorem**: the total complexity stays the same, but each piece has a single responsibility
