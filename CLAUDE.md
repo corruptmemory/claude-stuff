@@ -138,13 +138,56 @@ glab mr create --fill --yes
 - `--repo` accepts `OWNER/REPO` or `GROUP/NAMESPACE/REPO` format, NOT a full `https://` URL
 - Auth token can expire silently — check with `glab auth status` before blaming flag syntax
 
+## playwright-cli (standalone CLI browser automation)
+
+`playwright-cli` is installed globally at `/usr/bin/playwright-cli`. This is a **separate tool** from the Playwright MCP plugin — it's a standalone CLI for browser automation.
+
+**Config file:** Each project needs `.playwright/cli.config.json`. The config structure mirrors Playwright's internal object hierarchy — flat top-level keys do NOT work:
+
+```json
+{
+  "browser": {
+    "launchOptions": {
+      "channel": "chrome",
+      "executablePath": "/usr/bin/brave",
+      "headless": false
+    }
+  }
+}
+```
+
+**To initialize a project:** Run `playwright-cli install` (this just creates the `.playwright/` workspace directory, it does NOT install browsers).
+
+**Connecting to an existing Brave session (preferred):**
+
+The user has the "Playwright MCP Bridge" browser extension installed in his default Brave profile. To connect to an existing browser instead of launching a new one:
+
+```bash
+playwright-cli open --extension
+```
+
+This connects via the bridge extension and gives access to pages where the user has active sessions (LinkedIn, etc.). The user will approve the tab connection in the browser.
+
+**Key commands:**
+- `playwright-cli snapshot` — get page accessibility tree (best for reading page content)
+- `playwright-cli goto <url>` — navigate
+- `playwright-cli click <ref>` — click element by ref from snapshot
+- `playwright-cli type <text>` — type into focused element
+- `playwright-cli fill <ref> <text>` — fill a form field
+- `playwright-cli tab-list` — list open tabs
+- `playwright-cli tab-select <index>` — switch tabs
+- `playwright-cli close` — close the browser session
+
+**Do NOT** run `playwright-cli open` without `--extension` unless you specifically need a fresh browser — it launches a new Brave instance with an in-memory profile (no logins).
+
 ## Available CLI Tools
 
 These tools are installed on all machines and can be used freely:
 
 - **`gh`** — GitHub CLI
 - **`glab`** — GitLab CLI
-- **`npx @playwright/mcp@latest`** — Playwright CLI
+- **`npx @playwright/mcp@latest`** — Playwright MCP server (for Claude Code's MCP plugin)
+- **`playwright-cli`** — Standalone browser automation CLI (see section above)
 - **`az`** — Azure CLI
 - **`aws`** — AWS CLI
 
