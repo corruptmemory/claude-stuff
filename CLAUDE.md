@@ -180,6 +180,34 @@ This connects via the bridge extension and gives access to pages where the user 
 
 **Do NOT** run `playwright-cli open` without `--extension` unless you specifically need a fresh browser — it launches a new Brave instance with an in-memory profile (no logins).
 
+**Converting scraped pages to Markdown:** Instead of parsing large accessibility tree snapshots in-context, save the page HTML to a file and use the `to-markdown` MCP server to convert it. This uses Cloudflare AI server-side and returns clean Markdown — far fewer tokens than parsing raw snapshots.
+
+```bash
+# 1. Save page source to a file
+playwright-cli eval "document.documentElement.outerHTML" > /tmp/page.html
+
+# 2. Use the to-markdown MCP tool on the saved file
+#    (call mcp__to-markdown__to-markdown with filePaths=["/tmp/page.html"])
+```
+
+The `to-markdown` MCP server is installed at `~/.local/share/mcp-server-to-markdown/`. It requires a Cloudflare account. Per-project setup in `.mcp.json`:
+
+```json
+{
+  "mcpServers": {
+    "to-markdown": {
+      "command": "bash",
+      "args": [
+        "-c",
+        "export CLOUDFLARE_API_TOKEN=\"$(cat ~/.cloudflare-api-token)\" && export CLOUDFLARE_ACCOUNT_ID=30d94cb16df85f492ca95b88e561a6c2 && exec node ~/.local/share/mcp-server-to-markdown/dist/index.js"
+      ]
+    }
+  }
+}
+```
+
+Add `"mcp__to-markdown__to-markdown"` to the project's `.claude/settings.local.json` permissions allow list.
+
 ## Available CLI Tools
 
 These tools are installed on all machines and can be used freely:
