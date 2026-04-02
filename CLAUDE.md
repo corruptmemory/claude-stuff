@@ -138,23 +138,40 @@ glab mr create --fill --yes
 - `--repo` accepts `OWNER/REPO` or `GROUP/NAMESPACE/REPO` format, NOT a full `https://` URL
 - Auth token can expire silently — check with `glab auth status` before blaming flag syntax
 
-## Claude in Chrome (preferred browser automation)
+## marksnip (preferred web page reading)
 
-The "Claude in Chrome" extension is installed in Brave and connected. **Prefer this over playwright-cli for all browser interaction.** It's simpler (direct MCP tools, no CLI intermediary), sees what the user sees (logged-in sessions, no scraping heuristics), and doesn't require ref-tracking or YAML snapshot parsing.
+**`marksnip` is the preferred way to read web pages.** It uses the MarkSnip browser extension in Brave to convert any page to clean Markdown via a local native messaging bridge. No cloud relay, no feature flags, works with authenticated sessions.
 
-**Enable:** `claude --chrome` or `/chrome` in a session. Status visible via `/chrome`.
+Binary: `~/.local/bin/marksnip` (symlinked from `~/projects/marksnip/marksnip`)
 
-**Basic workflow:**
-1. `tabs_context_mcp` — see existing tabs or create a tab group
-2. `navigate` — go to a URL
-3. `read_page` or `get_page_text` — get page content
-4. `find` — search for elements on the page
-5. `form_input` — fill form fields
-6. `javascript_tool` — run JS on the page
+**To read a URL:**
+```bash
+xdg-open "https://example.com" && sleep 3 && marksnip clip --fresh
+```
+For heavy JS pages use `sleep 5`. The `--fresh` flag bypasses cache and forces a live capture.
 
-**Why this is better than scraping tools:** WebFetch, Perplexity, and other scraping tools get whatever they can access — which may be paywalled summaries, stale caches, or nothing at all. Claude in Chrome sees the actual page content in the user's authenticated browser. When factual accuracy matters (job descriptions, company info, pricing), prefer Claude in Chrome over indirect scraping.
+**To read the currently active Brave tab:**
+```bash
+marksnip clip
+```
 
-**Site permissions:** The user approves sites in the extension settings. Already approved: developers.cloudflare.com, workers.cloudflare.com. New sites will prompt for approval.
+**JSON output** (includes url, title, markdown, capturedAt):
+```bash
+marksnip clip --json
+```
+
+**Why marksnip over other tools:**
+- **vs WebFetch/Perplexity**: sees the actual rendered page in the user's authenticated browser — no paywalls, no stale caches, no JS rendering issues
+- **vs playwright-cli/Claude-in-Chrome**: much cheaper (clean Markdown vs HTML or accessibility trees), no ref-tracking, no YAML parsing
+- **vs all scraping tools**: works on any site the user is logged into
+
+**Check bridge status:** `marksnip status` — should show `chrome: connected`
+
+## Claude in Chrome (NOT WORKING on Brave — skip)
+
+Claude in Chrome does not work on Brave due to a server-side feature flag (`chrome_ext_bridge_enabled`) that Anthropic only enables for Chrome and Edge. The extension installs fine but the WebSocket bridge to `bridge.claudeusercontent.com` never connects. Use marksnip instead for all web reading tasks.
+
+## playwright-cli (fallback browser automation)
 
 ## playwright-cli (fallback browser automation)
 
