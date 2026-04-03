@@ -1,0 +1,7 @@
+# Compiled binaries (no extension, same name as .jai files)
+*
+!*.jai
+!.gitignore
+
+# Jai build artifacts
+.build/

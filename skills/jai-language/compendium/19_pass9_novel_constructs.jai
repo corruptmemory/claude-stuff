@@ -1,5 +1,5 @@
 // Compendium entry 19: Pass 9 Novel Constructs
-// Jai Compiler Version: beta 0.2.025 (19 January 2026)
+// Jai Compiler Version: beta 0.2.026 (21 February 2026)
 // Platform: Linux x86-64
 // Sources:
 //   modules/Windows.jai (bare anonymous struct/union members)

@@ -1,5 +1,5 @@
 // Compendium entry 16: Named Return Capture, Standalone #no_aoc Blocks, #Context Type
-// Jai Compiler Version: beta 0.2.025 (19 January 2026)
+// Jai Compiler Version: beta 0.2.026 (21 February 2026)
 // Platform: Linux x86-64
 // Sources: modules/Basic/tests.jai (name=,), modules/Subtitles.jai (name:,),
 //          modules/executable_formats/tbd/tbd.jai (multiple name=,),

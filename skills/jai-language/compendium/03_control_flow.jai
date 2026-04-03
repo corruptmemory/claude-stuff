@@ -1,5 +1,5 @@
 // Compendium: Control Flow
-// Jai Version: beta 0.2.025
+// Jai Version: beta 0.2.026
 // Platform: Linux x86-64
 // Sources: how_to/040_control_flow.jai, how_to/050_for_loops.jai
 // Use-cases: if/else, if-case, for loops, while, defer, break/continue,

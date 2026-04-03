@@ -1,5 +1,5 @@
 // Compendium: Structs
-// Jai Version: beta 0.2.025
+// Jai Version: beta 0.2.026
 // Platform: Linux x86-64
 // Sources: how_to/070_structs.jai, how_to/080_using.jai
 // Use-cases: basic struct, defaults, using, embedding, polymorphic struct,
