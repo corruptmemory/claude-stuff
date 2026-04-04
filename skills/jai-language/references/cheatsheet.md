@@ -705,6 +705,48 @@ DELIM
 #type,isa Type                         // subtype variant
 ```
 
+### Type Variants (`#type,distinct` and `#type,isa`)
+<!-- verified: beta 0.2.026, from how_to/180_type_variants.jai -->
+```jai
+// #type,distinct — newtype: same layout, NO implicit cast to/from base type.
+// Use for type safety when you want the same representation but distinct identity.
+// Source: how_to/180_type_variants.jai
+Handle :: #type,distinct u32;          // u32 under the hood, but won't mix with u32
+Grid3i :: #type,distinct [3] s32;      // works with arrays too
+Fd     :: #type,distinct s32;          // e.g. tag file descriptors distinctly from s32
+
+a: Handle = 5;                         // literals implicitly cast (as with any numeric type)
+b: u32 = 42;
+// a = b;                              // ERROR: no implicit cast from u32 to Handle
+a = cast(Handle) b;                    // explicit cast OK
+a = xx (b + 1);                        // auto-cast OK
+a + a;                                 // built-in math operators work between same distinct type
+3 * a + 2;                             // math with literals works too
+
+// Introspection: type_info(Handle).type == .VARIANT
+// cast(*Type_Info_Variant) type_info(Handle) gives .variant_of pointing to u32's type_info
+// This lets compile-time code generators distinguish Handle from u32 via type_info.
+
+// #type,isa — subtype: same layout, IMPLICIT downcast to base type (one-way).
+// Forms a subtype chain: Fully_Pathed → Filename → string
+Filename     :: #type,isa string;      // can pass anywhere a string is accepted
+Fully_Pathed :: #type,isa Filename;    // can pass as Filename or string
+
+// Operator return type promotion: when a #type,isa value is implicitly downcast
+// to its base type for a procedure call, and the return type equals the base type,
+// the result is automatically promoted back to the variant type.
+// Source: how_to/180_type_variants.jai lines 84-99
+pa: Position3;  pb: Position3;         // Position3 :: #type,isa Vector3
+p := pa + pb;                          // calls Vector3 + Vector3, result promoted to Position3
+assert(type_of(p) == Position3);       // true
+
+// Compile-time use: distinct types are powerful for compile-time code generation.
+// A struct-walking macro can match on type_info to emit different code per field:
+//   member.type == type_info(Fd)  → emit fd-passing code (out-of-band)
+//   member.type == type_info(s32) → emit regular s32 serialization
+// Same runtime representation, different compile-time behavior. Zero overhead.
+```
+
 ### Introspection
 ```jai
 #caller_location                       // Source_Code_Location of caller
