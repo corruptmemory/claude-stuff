@@ -425,6 +425,11 @@ Thing :: union fruit: Fruit {
     .ORANGE ,, z := "text";
 }
 // NOTE: ,, syntax for bindings is experimental and may change (case keyword considered)
+// IMPORTANT: Each variant supports exactly ONE field binding. Multi-field variants
+// require a wrapper struct. Source: jai-wayland code generator (2026-04-03).
+// Example workaround for multi-field event data:
+//   Motion_Args :: struct { time: u32; x: Fixed; y: Fixed; }
+//   Event :: union kind: Kind { .MOTION ,, motion: Motion_Args; }
 // Type_Info_Tagged_Union_Binding available in modules/Preload for metaprogramming
 
 // Parameterized (polymorphic) union
@@ -1167,6 +1172,59 @@ fmt := "C://Users//file.txt";
 // Tree-sitter's lexer operates at a level below the grammar and will match //
 // as a comment token before the grammar can consume it as string content.
 // This is a fundamental tree-sitter limitation, not a grammar bug.
+```
+
+## File I/O and String Formatting
+<!-- verified: beta 0.2.026 -->
+
+### File Module (`#import "File"`)
+```jai
+// Reading
+contents, ok := read_entire_file("path/to/file.txt");     // -> string, bool
+
+// Writing — three overloads:
+write_entire_file("out.txt", "string data");               // string -> bool
+write_entire_file("out.bin", data_ptr, byte_count);        // *void, int -> bool
+write_entire_file("out.jai", *builder);                    // *String_Builder -> bool (resets builder)
+write_entire_file("out.jai", *builder, do_reset = false);  // keep builder contents after write
+
+// Directories
+make_directory_if_it_does_not_exist("path/to/dir");
+
+// Source: modules/File/module.jai
+```
+
+### File_Utilities Module (`#import "File_Utilities"`)
+```jai
+// Walk directory tree — callback receives *File_Visit_Info and userdata pointer
+visit_files("dir", recursive = true, *context, (info: *File_Visit_Info, ctx: *My_Ctx) {
+    if ends_with(info.full_name, ".xml") { /* process */ }
+});
+// Source: modules/File_Utilities/module.jai
+```
+
+### String Formatting (`#import "Basic"`)
+```jai
+// String_Builder for building output
+sb: String_Builder;
+sb.allocator = temp;                                       // use temp allocator for transient strings
+print_to_builder(*sb, "% :: struct {\n", type_name);
+result := builder_to_string(*sb,, allocator = temp);       // note: ,, skips do_reset param
+
+// tprint — temp-allocated sprintf
+name := tprint("%_%", prefix, suffix);
+
+// formatInt — integer formatting with base, padding, minimum digits
+// Source: modules/Basic/Print.jai
+tprint("%", formatInt(255, base = 16));                    // "ff"
+tprint("%", formatInt(42, minimum_digits = 5));            // "00042"
+tprint("%", formatInt(1000, digits_per_comma = 3, comma_string = ","));  // "1,000"
+// FormatInt struct: { base := 10; minimum_digits := 1; padding: u8 = '0';
+//                     digits_per_comma: u16 = 0; comma_string := ""; }
+
+// formatFloat — float formatting
+tprint("%", formatFloat(3.14, trailing_width = 2));        // "3.14"
+// FormatFloat.Mode :: enum { DECIMAL; SCIENTIFIC; SHORTEST; }
 ```
 
 ## Context System
