@@ -1,5 +1,5 @@
 // Compendium: Polymorphism & Generics
-// Jai Version: beta 0.2.026
+// Jai Version: beta 0.2.027
 // Platform: Linux x86-64
 // Sources: how_to/100_polymorphic_procedures.jai, how_to/120_polymorphic_structs.jai,
 //          how_to/170_modify.jai, how_to/160_type_restrictions.jai

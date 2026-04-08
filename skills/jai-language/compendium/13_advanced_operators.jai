@@ -1,5 +1,5 @@
 // Compendium: Advanced Operators & Special Syntax
-// Jai Version: beta 0.2.026
+// Jai Version: beta 0.2.027
 // Platform: Linux x86-64
 // Sources: modules/md5.jai, modules/xxHash/module.jai, modules/Bindings_Generator/restart.jai,
 //          modules/Thread/module.jai, modules/Hash.jai
@@ -21,7 +21,7 @@ rotate_demo :: () {
 
 // === Postfix dereference .* ===
 // .* as postfix operator dereferences a pointer; use (.*) in prefix position
-// Note: << prefix dereference was deprecated in 0.2.026
+// Note: << prefix dereference was deprecated in 0.2.022
 // Source: modules/Bindings_Generator/restart.jai line 43
 prefix_deref_demo :: () {
     x := 42;

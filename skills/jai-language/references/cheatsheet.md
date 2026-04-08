@@ -1,16 +1,16 @@
 # Jai Language Cheat Sheet
 
-> **Jai Version**: beta 0.2.026 (21 February 2026)
+> **Jai Version**: beta 0.2.027 (7 April 2026)
 > **Platform**: Linux x86-64
 > **All entries verified against**: `~/jai/jai/` distribution (how_to/, modules/, examples/)
-> **Last updated**: 2026-02-21
+> **Last updated**: 2026-04-08
 
 ## Ecosystem Context
 
 Jai is a general-purpose systems-level language being developed primarily in the context of building a first-class multi-platform game engine. As a result, the standard library is oriented toward game development needs (graphics, audio, math, threading, file I/O) and intentionally omits many "batteries included" features common in languages like Go, Python, or Rust. Notable gaps include: HTTP servers/clients (there is a `Curl` module wrapping libcurl), JSON serialization/deserialization, broad cryptography support, template engines, and package management. There is no package manager by design — external code is vendored directly into the project's `modules/` directory. When building non-game applications (web servers, data pipelines, CLI tools), expect to implement or vendor these capabilities yourself.
 
 ## Declarations
-<!-- verified: beta 0.2.026 -->
+<!-- verified: beta 0.2.027 -->
 
 ```jai
 x := 5;                        // variable, type inferred
@@ -53,7 +53,7 @@ a, d:, c = 4, 5, 6;                                 // d: declares new; a,c assi
 ```
 
 ## Procedures
-<!-- verified: beta 0.2.026 -->
+<!-- verified: beta 0.2.027 -->
 
 ```jai
 // Basic
@@ -82,7 +82,7 @@ name :: () -> result: *Entity = null, status := SUCCESS { }  // mixed with :=
 name :: () -> string, success: bool { }           // mixed named/unnamed
 name :: () -> (result: int, ok: bool) { }         // parenthesized
 
-// NOTE: #must does NOT exist in beta 0.2.026
+// NOTE: #must does NOT exist in beta 0.2.027
 
 // Polymorphism
 name :: (x: $T) -> T { }                          // polymorphic ($T)
@@ -141,7 +141,7 @@ result := no_inline expensive();
 ```
 
 ## Operator Overloading
-<!-- verified: beta 0.2.026 -->
+<!-- verified: beta 0.2.027 -->
 
 ```jai
 operator + :: (a: Vec2, b: Vec2) -> Vec2 { }
@@ -161,7 +161,7 @@ operator- :: Basic.operator-;          // import operator from another module
 ```
 
 ## Types
-<!-- verified: beta 0.2.026 -->
+<!-- verified: beta 0.2.027 -->
 
 ### Primitives
 - `int` (s64), `u8` `u16` `u32` `u64`, `s8` `s16` `s32` `s64`
@@ -203,7 +203,7 @@ initializer_of(Type)           // default initializer procedure
 ```
 
 ### Number Literals
-<!-- verified: beta 0.2.026 -->
+<!-- verified: beta 0.2.027 -->
 ```jai
 42                             // decimal integer
 0xff                           // hexadecimal (0x prefix)
@@ -222,7 +222,7 @@ initializer_of(Type)           // default initializer procedure
 ```
 
 ## Structs
-<!-- verified: beta 0.2.026 -->
+<!-- verified: beta 0.2.027 -->
 
 ```jai
 Vector3 :: struct {
@@ -284,11 +284,8 @@ GL_Procedures :: struct #type_info_procedures_are_void_pointers #type_info_no_si
 // ~6 of #type_info_no_size_complaint across the distribution
 
 // Memory layout
-Layout :: struct {
-    #place x;                       // explicit field placement
-    x: float;
-    y: float;
-}
+// NOTE: #place was REMOVED in beta 0.2.027 (won't compile). Use #overlay instead.
+// Layout :: struct { #place x; x: float; y: float; }  // NO LONGER VALID
 
 // #overlay — alias a field over an existing field's memory
 // Source: modules/Float16.jai
@@ -357,7 +354,7 @@ Extended :: struct {
 ```
 
 ## Struct/Array Literals
-<!-- verified: beta 0.2.026 -->
+<!-- verified: beta 0.2.027 -->
 
 ```jai
 Type.{field = value, field2 = value2}    // named fields
@@ -382,7 +379,7 @@ a = .[{3, "Yes"}, {2, "No"}]            // non-dot struct literals inside array 
 ```
 
 ## Enums
-<!-- verified: beta 0.2.026 -->
+<!-- verified: beta 0.2.027 -->
 
 ```jai
 Direction :: enum { NORTH; SOUTH; EAST; WEST; }
@@ -396,7 +393,7 @@ using enum u16 { NONE; SOME :: 5; ALL; }
 ```
 
 ## Unions
-<!-- verified: beta 0.2.026 -->
+<!-- verified: beta 0.2.027 -->
 
 ```jai
 // Basic union
@@ -443,7 +440,7 @@ buffer: SymbolBuffer(MAX_NAME_LEN);  // instantiation with parameter
 ```
 
 ## Control Flow
-<!-- verified: beta 0.2.026 -->
+<!-- verified: beta 0.2.027 -->
 
 ### If Statement
 ```jai
@@ -525,7 +522,7 @@ my_macro :: () #expand {
 ```
 
 ### Loop-Body Directives
-<!-- verified: beta 0.2.026 -->
+<!-- verified: beta 0.2.027 -->
 ```jai
 // #no_abc and #no_aoc can appear BETWEEN iterable and body in for loops
 // Source: modules/Hash.jai
@@ -537,7 +534,7 @@ for 0..size-1 #no_abc #no_aoc {        // no array bounds check, no auto output 
 ```
 
 ### Standalone #no_aoc / #no_abc Block Statements
-<!-- verified: beta 0.2.026 -->
+<!-- verified: beta 0.2.027 -->
 ```jai
 // #no_aoc can wrap an arbitrary block of statements (NOT just for-loops)
 // This disables arithmetic overflow checking for the enclosed operations
@@ -579,7 +576,7 @@ result := #ifx cond then a else b;     // compile-time ifx
 ```
 
 ## Directives
-<!-- verified: beta 0.2.026 -->
+<!-- verified: beta 0.2.027 -->
 
 ### Imports
 ```jai
@@ -706,7 +703,7 @@ DELIM
 ```
 
 ### Type Variants (`#type,distinct` and `#type,isa`)
-<!-- verified: beta 0.2.026, from how_to/180_type_variants.jai -->
+<!-- verified: beta 0.2.027, from how_to/180_type_variants.jai -->
 ```jai
 // #type,distinct — newtype: same layout, NO implicit cast to/from base type.
 // Use for type safety when you want the same representation but distinct identity.
@@ -797,7 +794,7 @@ assert(type_of(p) == Position3);       // true
 ```
 
 ### External Declarations (`#elsewhere`)
-<!-- verified: beta 0.2.026 -->
+<!-- verified: beta 0.2.027 -->
 ```jai
 // #elsewhere declares variables/procedures whose bodies live in external libraries
 // Source: examples/dll/main.jai, modules/macOS/bindings/core_foundation.jai, modules/macOS/bindings/mach.jai
@@ -844,7 +841,7 @@ NSApp: *NSApplication #elsewhere;                               // from AppKit
 ```
 
 ### Code Literals
-<!-- verified: beta 0.2.026 -->
+<!-- verified: beta 0.2.027 -->
 ```jai
 #code { block; }                        // code literal (type: Code)
 #code expr;                             // expression as code
@@ -869,7 +866,7 @@ f :: ($c: Code) -> u32 {
 ```
 
 ### Compile-Time AST Rewriting (#code + compiler_get_nodes + #insert)
-<!-- verified: beta 0.2.026, from how_to/630_compiler_get_nodes.jai -->
+<!-- verified: beta 0.2.027, from how_to/630_compiler_get_nodes.jai -->
 ```jai
 // Pattern: Walk/modify AST captured with #code, then #insert the result.
 // Requires: #import "Compiler";
@@ -961,7 +958,7 @@ my_macro2 :: (row: *$T, override_code: Code = #code .[]) #expand {
 ```
 
 ### Metaprogramming Directives
-<!-- verified: beta 0.2.026 -->
+<!-- verified: beta 0.2.027 -->
 ```jai
 // #poke_name — replace a name in an inserted/injected scope
 // Source: modules/Iprof/instrument.jai
@@ -1020,7 +1017,7 @@ my_macro2 :: (row: *$T, override_code: Code = #code .[]) #expand {
 ```
 
 ## Operators
-<!-- verified: beta 0.2.026 -->
+<!-- verified: beta 0.2.027 -->
 
 ### Precedence (high to low)
 
@@ -1045,7 +1042,7 @@ my_macro2 :: (row: *$T, override_code: Code = #code .[]) #expand {
 | 1 | `=`, `+=`, `-=`, `*=`, `/=`, `%=`, `&=`, `\|=`, `^=`, `<<=`, `>>=`, `&&=`, `\|\|=` | Assignment |
 
 ### Rotate Operators
-<!-- verified: beta 0.2.026 -->
+<!-- verified: beta 0.2.027 -->
 ```jai
 x <<< n                               // rotate left (same precedence as <<)
 x >>> n                                // rotate right (same precedence as >>)
@@ -1053,7 +1050,7 @@ x >>> n                                // rotate right (same precedence as >>)
 ```
 
 ### Prefix Dereference (`<<`) — DEPRECATED
-<!-- verified: beta 0.2.026 -->
+<!-- verified: beta 0.2.027 -->
 ```jai
 // WARNING: Unary << is DEPRECATED as of beta 0.2.022 and will be REMOVED in a future beta.
 // Use (.*) or postfix .* instead.
@@ -1097,7 +1094,7 @@ xx,force x                            // autocast force (bypasses checks)
 ```
 
 ## Special Syntax
-<!-- verified: beta 0.2.026 -->
+<!-- verified: beta 0.2.027 -->
 
 ```jai
 .ENUM_VALUE                            // unary dot (type-inferred enum)
@@ -1162,7 +1159,7 @@ using,map(prefix_fn) x;              // using with name remapping function
 ```
 
 ## Escape Sequences (in string literals)
-<!-- verified: beta 0.2.026 -->
+<!-- verified: beta 0.2.027 -->
 
 | Escape | Meaning |
 |--------|---------|
@@ -1195,7 +1192,7 @@ s := trim_right(cmd, "\d010\d013\d032");  // \d032 = space (32)
 ```
 
 ## Comments
-<!-- verified: beta 0.2.026 -->
+<!-- verified: beta 0.2.027 -->
 
 ```jai
 // Line comment
@@ -1217,7 +1214,7 @@ fmt := "C://Users//file.txt";
 ```
 
 ## File I/O and String Formatting
-<!-- verified: beta 0.2.026 -->
+<!-- verified: beta 0.2.027 -->
 
 ### File Module (`#import "File"`)
 ```jai
@@ -1270,7 +1267,7 @@ tprint("%", formatFloat(3.14, trailing_width = 2));        // "3.14"
 ```
 
 ## Context System
-<!-- verified: beta 0.2.026 -->
+<!-- verified: beta 0.2.027 -->
 
 Every Jai procedure receives an implicit `context` parameter containing:
 - Allocator (default and temporary)
@@ -1286,23 +1283,24 @@ context.allocator = my_allocator;      // modify directly
 ```
 
 ## Language Evolution & Deprecations
-<!-- Source: CHANGELOG.txt beta 0.2.019 through 0.2.026 -->
+<!-- Source: CHANGELOG.txt beta 0.2.019 through 0.2.027 -->
 
 ### Removed Features
 | Feature | Removed In | Replacement |
 |---------|------------|-------------|
+| `#place` directive | 0.2.027 | `#overlay` |
 | `#must` directive | 0.2.022 | No replacement (return value checking removed) |
 | `cast.*(T)` infix cast | 0.2.022 | `cast(T) expr` |
 | `cast(T).*` infix cast | 0.2.022 | `cast(T) expr` |
 | `%%` as literal % in print | 0.2.022 | Use `\%` instead |
 | `#v2` for-loop directive | 0.2.019 | Remove (transition aid, no longer needed) |
 | enum `.loose` member | 0.2.022 | Use metaprogramming |
+| `Code_Directive_Place` | 0.2.027 | Removed from `modules/Compiler/Compiler.jai` |
 
 ### Deprecated Features
 | Feature | Deprecated In | Will Be Removed | Replacement |
 |---------|---------------|-----------------|-------------|
-| Unary `<<` prefix deref | 0.2.022 | Next beta | `(.*)`  or postfix `.*` |
-| `#place` directive | 0.2.021 | Imminent | `#overlay` |
+| Unary `<<` prefix deref | 0.2.022 | Future | `(.*)`  or postfix `.*` |
 | `[]` on pointer types | 0.2.022 | Future | Dereference pointer first |
 | `-release` CLI flag | 0.2.026 | Future | `-o` or `-optimized` |
 | `-release_debug` CLI flag | 0.2.026 | Future | `-od` or `-optimized_debug` |
@@ -1327,7 +1325,7 @@ context.allocator = my_allocator;      // modify directly
 | print() tagged union display | 0.2.026 | Prints as `{TAG, value}`, cross-refs correct field |
 
 ## Tree-Sitter Grammar Issues (tracked for parser development)
-<!-- verified: beta 0.2.026 -->
+<!-- verified: beta 0.2.027 -->
 
 ### Category A: Action overflow / state explosion (cannot add without fundamental restructuring)
 | Issue | Description | Impact | Actions |

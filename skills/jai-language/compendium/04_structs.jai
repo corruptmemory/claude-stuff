@@ -1,9 +1,9 @@
 // Compendium: Structs
-// Jai Version: beta 0.2.026
+// Jai Version: beta 0.2.027
 // Platform: Linux x86-64
 // Sources: how_to/070_structs.jai, how_to/080_using.jai
 // Use-cases: basic struct, defaults, using, embedding, polymorphic struct,
-//   struct literals, #place, struct modifiers
+//   struct literals, struct modifiers (#place REMOVED in 0.2.027, use #overlay)
 
 #import "Basic";
 

@@ -1,5 +1,5 @@
 // Compendium: Declarations
-// Jai Version: beta 0.2.026
+// Jai Version: beta 0.2.027
 // Platform: Linux x86-64
 // Sources: how_to/010_calling_procedures.jai, how_to/020_declarations.jai
 // Use-cases: variable declaration, type inference, constants, typed constants,
