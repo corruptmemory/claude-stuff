@@ -45,6 +45,12 @@ a, b=, c := 1, 2, 3;                               // a,c declared; b= assigns t
 success=, tbds := parse_tbd(content);                // success= assigns existing; tbds declared
 success, tbdv3, complete=, lexer= := parse_yaml(l, T); // complete=, lexer= assign to existing
 //
+// CONSTRAINT: `:=` declares the left-hand side — you cannot "declare" a struct field member.
+// Same semantics as Go's := vs =. Struct fields are assignment targets, not declarations.
+//   obj.field, count := get_data();      // ERROR: obj.field is not a declarable name
+//   count: u32;                          // FIX: pre-declare, then use plain =
+//   obj.field, count = get_data();       // OK: both sides are assignment targets
+//
 // Examples in `=` context (all names assign to existing UNLESS marked with `:`):
 success:, module_index = table_find(*indices, key);  // success: declares new; module_index assigns
 found, file_line:, remainder = split_from_left(s);   // file_line: declares new; found,remainder assign
@@ -428,6 +434,17 @@ Thing :: union fruit: Fruit {
 //   Motion_Args :: struct { time: u32; x: Fixed; y: Fixed; }
 //   Event :: union kind: Kind { .MOTION ,, motion: Motion_Args; }
 // Type_Info_Tagged_Union_Binding available in modules/Preload for metaprogramming
+// Walking tagged union bindings at compile time:
+//   si := cast(*Type_Info_Struct) ti;
+//   tag_member := si.members[0];                   // first member is the tag field
+//   tag_type := cast(*Type_Info_Struct) tag_member.type;  // the enum type
+//   for binding: si.tagged_union_bindings {
+//       variant := si.members[binding.member_index]; // the variant's field
+//       variant_type := cast(*Type_Info_Struct) variant.type;  // the variant's arg struct
+//       // binding.constant_value is the tag enum value (u64)
+//       // variant.name is the field name (e.g., "mode")
+//       // Use to generate dispatch code: if tag == N { handle variant }
+//   }
 
 // Parameterized (polymorphic) union
 // Source: modules/Debug/windows.jai
@@ -487,6 +504,24 @@ for_expansion :: (container: *$T, body: Code, flags: For_Flags) #expand {
     // `it, `it_index exported to caller via backtick
     // #insert (break=..., remove=...) body;
 }
+
+// Exporting additional state beyond it/it_index:
+// Any backtick variable declared in the for_expansion is visible in the loop body.
+// Source: how_to/730_for_expansions.jai (extra_info example)
+for_expansion :: (holder: *Holder, body: Code, flags: For_Flags) #expand {
+    _internal: InternalState;        // underscore prefix avoids shadowing
+    `state := *_internal;            // expose pointer to loop body
+    `visited_index := 0;
+    for ok, slot_index: holder.occupied {
+        if !ok continue;
+        `it := holder.values[slot_index];
+        `it_index := slot_index;
+        defer `visited_index += 1;   // defer so continue still increments
+        #insert(break=break) body;
+    }
+}
+// Usage: loop body can reference `state` and `visited_index` by name
+for holder { print("%, state=%\n", it, state.*); }
 ```
 
 ### While Loop
@@ -1100,6 +1135,7 @@ xx,force x                            // autocast force (bypasses checks)
 .ENUM_VALUE                            // unary dot (type-inferred enum)
 ..array                                // spread (unpack into varargs, types must match)
 func(args,, allocator = temp)          // comma-comma (context override)
+ptr := New(MyStruct,, temp);           // allocate from temporary storage via ,,
 `name                                  // backtick (keyword as identifier)
 `return false, .{};                    // backtick return (return from caller in #expand macro)
 `break;                                // backtick break (break caller's loop)

@@ -40,6 +40,29 @@ compute_table :: () -> [5] int {
     return result;
 }
 
+// === for_expansion with custom exported state ===
+// Source: how_to/730_for_expansions.jai
+// Backtick variables declared inside for_expansion are visible in the loop body.
+// Use underscore prefix for internal state to avoid shadowing the exported name.
+
+Pair :: struct { key: string; value: int; }
+
+Pairs :: struct {
+    items: [3] Pair;
+    count: int;
+}
+
+for_expansion :: (pairs: *Pairs, body: Code, flags: For_Flags) #expand {
+    _total: int = 0;               // internal accumulator
+    `total := *_total;              // expose pointer to loop body
+    for i: 0..pairs.count-1 {
+        `it := pairs.items[i];
+        `it_index := i;
+        _total += pairs.items[i].value;
+        #insert(break=break) body;
+    }
+}
+
 main :: () {
     // #expand macro
     set_to_zero();
@@ -64,4 +87,14 @@ main :: () {
     code_expr :: #code val + 5;
     computed := #insert code_expr;
     print("insert expr = %\n", computed);
+
+    // for_expansion with custom exported state
+    pairs: Pairs;
+    pairs.items[0] = .{"a", 10};
+    pairs.items[1] = .{"b", 20};
+    pairs.items[2] = .{"c", 30};
+    pairs.count = 3;
+    for pairs {
+        print("  % = % (running total: %)\n", it.key, it.value, total.*);
+    }
 }
