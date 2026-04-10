@@ -522,6 +522,20 @@ for_expansion :: (holder: *Holder, body: Code, flags: For_Flags) #expand {
 }
 // Usage: loop body can reference `state` and `visited_index` by name
 for holder { print("%, state=%\n", it, state.*); }
+
+// CRITICAL: #insert only remaps keywords you specify. If you remap break
+// but not continue, a `continue` in the body targets the innermost loop
+// in the for_expansion — which may skip post-body cleanup code.
+// Solution: use `defer` for any post-body logic that must always run.
+// Source: how_to/730_for_expansions.jai line 133
+for_expansion :: (q: *Queue, body: Code, flags: For_Flags) #expand {
+    while msg := q.peek() {
+        defer q.consume(msg);        // runs on normal exit, continue, AND break
+        `it := msg;
+        `it_index := 0;
+        #insert(break=break) body;   // continue in body skips to defer, not past it
+    }
+}
 ```
 
 ### While Loop
@@ -685,8 +699,10 @@ Source: `modules/Thread/module.jai`
 #insert expr;                           // code insertion (string: resolves in textual scope)
 #insert,scope() expr;                  // with scope (Code: inherits caller scope; string: still textual scope)
 #insert(break=break outer) expr;       // with break parameter mapping
+#insert(continue=continue outer) expr; // with continue parameter mapping
 #insert(remove=#assert(false)) expr;   // with remove parameter
 #insert(break=break slot, remove={stmt; stmt;}) expr;  // combined break + remove
+#insert(break=break outer, continue=continue inner) expr;  // combined break + continue
 #insert(remove={inline remove_fn(arr, `it_index); `it_index -= 1;}) body;  // remove with compound body
 #insert -> Code { return #code x = 1; }  // short form (arrow + block)
 #code { block; }                        // code literal (type: Code)
