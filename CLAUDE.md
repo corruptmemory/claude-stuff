@@ -19,6 +19,96 @@ Always use `./build.sh` — never invoke `go build`, `go test`, `templ generate`
 
 For shared mutable state accessed by HTTP handlers, I prefer the goroutine actor pattern over mutexes or atomic pointers. A single goroutine owns all mutable state, handlers communicate via typed command channels. See the `actor-pattern` skill for the full implementation guide.
 
+## Open Brain (personal memory MCP) — install on EVERY machine
+
+**Open Brain must be installed on every machine that runs Claude Code.** It's the self-hosted personal memory system: a docker-compose stack running on `node-0` in the basement, fronted by Caddy at `http://open-brain/` on the home LAN. Any Claude Code instance that isn't registered with Open Brain can neither read from nor contribute to the shared brain — that machine is effectively amnesiac relative to every other machine in the fleet.
+
+### Where the `MCP_ACCESS_KEY` comes from (bootstrap order)
+
+The access key is a random 64-char hex value generated when the Open Brain stack was first deployed on `node-0`. The **authoritative source** is node-0's `.env` file:
+
+```
+/home/open-brain/repo/integrations/docker-compose-deployment/.env
+```
+
+On **any already-configured machine** (like this desktop), a local copy lives in `~/.claude.json` under `mcpServers["open-brain"].headers["x-brain-key"]`. Two ways to retrieve it on a new machine:
+
+**A) Via SSH to node-0** (requires ssh-agent + ForwardAgent already set up — see the i3-screen-manager docs):
+```bash
+MCP_KEY=$(ssh node-0 "grep '^MCP_ACCESS_KEY=' /home/open-brain/repo/integrations/docker-compose-deployment/.env | cut -d= -f2-")
+```
+
+**B) Via `jq` on an already-configured machine**, then copied to the new machine out-of-band:
+```bash
+# Run on an existing machine that already has open-brain registered:
+jq -r '.mcpServers["open-brain"].headers["x-brain-key"]' ~/.claude.json
+```
+
+**Bootstrap order when setting up a brand-new machine** (laptop or similar):
+
+1. ssh-agent fix in `~/.local/bin/start-hyprland` (documented in `~/projects/i3-screen-manager/docs/`)
+2. Verify `ssh node-0` works cleanly
+3. Clone `~/.claude` from `corruptmemory/claude-stuff` (this gives you this CLAUDE.md and the skill symlinks)
+4. Clone `~/projects/open-brain` from `corruptmemory/OB1` (this gives the skill symlinks a target to resolve to)
+5. Retrieve the key via Option A or B above
+6. Run `claude mcp add` (below)
+7. Verify
+
+### Register the MCP connection (once per machine, user-scope)
+
+```bash
+# --scope user stores the connector globally in ~/.claude.json so it's visible
+# in every Claude Code session on this machine, regardless of project directory.
+# NOT project-scoped — this is not the kind of thing you re-add per repo.
+claude mcp add open-brain http://open-brain/ \
+    --transport http \
+    --scope user \
+    --header "x-brain-key: ${MCP_KEY}"
+
+# Verify:
+claude mcp list | grep open-brain    # expect: "http://open-brain/ (HTTP) - ✓ Connected"
+```
+
+**Gotcha:** `claude mcp add`'s `--header` flag is variadic (`<header...>`), so **the URL must come immediately after the name**, before any `--header` option — otherwise the URL gets consumed as another header value and you get `error: missing required argument 'commandOrUrl'`.
+
+### Install the Open Brain skills (also once per machine, as symlinks)
+
+The behavioral skills that tell Claude Code *when* to capture thoughts live in the open-brain repo at `~/projects/open-brain/skills/`. Install them as symlinks so `git pull` in the open-brain clone keeps them fresh automatically:
+
+```bash
+# Assumes ~/projects/open-brain is a clone of corruptmemory/OB1.
+# Clone it first if the machine doesn't have it yet.
+for pack in auto-capture claudeception panning-for-gold \
+            research-synthesis competitive-analysis \
+            heavy-file-ingestion n-agentic-harnesses; do
+    ln -s "$HOME/projects/open-brain/skills/$pack" "$HOME/.claude/skills/$pack"
+done
+```
+
+`auto-capture` is the minimum viable install — it's the one that teaches Claude Code to write session-end decisions back to the brain without being asked. The other six are general workflow packs curated to daily knowledge work.
+
+### Travel devices (laptop) — the LAN URL isn't valid away from home
+
+`http://open-brain/` only resolves on the home LAN because `open-brain` is a local DNS record on the UDM Pro. When the laptop travels (coffee shop wifi, hotel, cellular hotspot), the hostname stops resolving and every `capture_thought` call fails silently. Two solutions — pick one when wiring up the laptop:
+
+**Option A — Tailscale-native endpoint (set-and-forget).** Run `tailscale serve` on `node-0` to expose the MCP endpoint on the tailnet FQDN with auto-provisioned HTTPS. Current syntax varies across Tailscale versions — verify with `tailscale serve --help` and `tailscale serve status` at deploy time. Conceptually:
+
+```bash
+# On node-0, once:
+tailscale serve --bg --https 8443 / http://127.0.0.1:8000
+```
+
+Then the laptop's Claude Code connector uses `https://node-0.taild01c0a.ts.net:8443/` (or similar). Tailscale MagicDNS resolves the tailnet FQDN from anywhere on the tailnet, so the same URL works from home and abroad. MCP server binding stays at `127.0.0.1:8000` because Tailscale Serve runs as a process on node-0 and can reach loopback like anything else.
+
+**Option B — ROFI toggle script (explicit control).** Write a small script at `~/.local/bin/open-brain-toggle-url` that rewrites the `mcpServers.open-brain.url` field in `~/.claude.json` between two values depending on where the laptop currently is:
+
+- `http://open-brain/` when on home LAN (bogusnet / HOME VLAN)
+- `http://node-0:8000/` or the Tailscale Serve URL from Option A when traveling
+
+Bind to a ROFI menu entry so it's a one-keypress switch. Adds a manual step on every network change, but matches the "explicit > implicit" aesthetic and is easier to debug than automatic DNS dispatch ("which URL am I on right now?" → `jq '.mcpServers["open-brain"].url' ~/.claude.json`).
+
+**Recommendation:** Start with **Option B** on the laptop while Open Brain is still a young system being iterated on — explicit control accelerates debugging when something breaks. Once the stack is stable and boring, migrate to **Option A** for set-and-forget. The laptop's Claude Code doesn't care which approach you pick; it just reads whatever URL is in `~/.claude.json`.
+
 ## Platform: Arch Linux with Brave Browser
 
 This machine runs Arch Linux. Chrome is **not installed**. The browser is **Brave** at `/usr/bin/brave`.
