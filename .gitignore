@@ -28,6 +28,10 @@ image-cache/
 mcp-needs-auth-cache.json
 telemetry/
 
+# Claude-in-Chrome native messaging host binaries (installed by the
+# extension; machine-specific, not source)
+chrome/
+
 # Build artifacts from Jai compendium (compiled ELF binaries + object files)
 skills/jai-language/compendium/.build/
 skills/jai-language/compendium/[0-9][0-9]_*
