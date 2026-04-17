@@ -141,68 +141,109 @@ find ~/.claude/plugins/cache -path '*/playwright/*/.mcp.json'
 
 The `mcp__*` wildcard in global `settings.json` does NOT actually suppress prompts for MCP tools. You must enumerate every tool explicitly in `.claude/settings.local.json` per project.
 
-**Recipe — copy this into any project's `.claude/settings.local.json`:**
+**Setup procedure for a new project (`just installed Claude Code here` / `first time in this dir`):**
+
+1. Run `claude mcp list` to see which MCP servers are connected on this machine.
+2. Always include the **Base plugins block** below (playwright + serena + context7).
+3. **ALWAYS** check for `open-brain` in `claude mcp list`. If present (expected on every machine — see the "Open Brain" section), add the **open-brain block**. If it's *missing*, stop and bootstrap open-brain before continuing — a machine without open-brain is amnesiac relative to the rest of the fleet.
+4. Check for `perplexity` in `claude mcp list`. If present, add the **perplexity block**.
+5. If any other MCP server shows up that prompts during use, enumerate its tools the same way and consider whether it's worth adding to this recipe for future projects.
+
+Tool names follow the pattern `mcp__plugin_<pluginname>_<servername>__<toolname>` for plugin-hosted servers, or `mcp__<servername>__<toolname>` for directly-registered servers (like open-brain and perplexity — these were added via `claude mcp add`, not via the plugin system, so they skip the `plugin_` infix).
+
+---
+
+### Base plugins block (always include)
+
+```json
+"mcp__plugin_playwright_playwright__browser_close",
+"mcp__plugin_playwright_playwright__browser_resize",
+"mcp__plugin_playwright_playwright__browser_console_messages",
+"mcp__plugin_playwright_playwright__browser_handle_dialog",
+"mcp__plugin_playwright_playwright__browser_evaluate",
+"mcp__plugin_playwright_playwright__browser_file_upload",
+"mcp__plugin_playwright_playwright__browser_fill_form",
+"mcp__plugin_playwright_playwright__browser_install",
+"mcp__plugin_playwright_playwright__browser_press_key",
+"mcp__plugin_playwright_playwright__browser_type",
+"mcp__plugin_playwright_playwright__browser_navigate",
+"mcp__plugin_playwright_playwright__browser_navigate_back",
+"mcp__plugin_playwright_playwright__browser_network_requests",
+"mcp__plugin_playwright_playwright__browser_run_code",
+"mcp__plugin_playwright_playwright__browser_take_screenshot",
+"mcp__plugin_playwright_playwright__browser_snapshot",
+"mcp__plugin_playwright_playwright__browser_click",
+"mcp__plugin_playwright_playwright__browser_drag",
+"mcp__plugin_playwright_playwright__browser_hover",
+"mcp__plugin_playwright_playwright__browser_select_option",
+"mcp__plugin_playwright_playwright__browser_tabs",
+"mcp__plugin_playwright_playwright__browser_wait_for",
+"mcp__plugin_serena_serena__read_file",
+"mcp__plugin_serena_serena__create_text_file",
+"mcp__plugin_serena_serena__list_dir",
+"mcp__plugin_serena_serena__find_file",
+"mcp__plugin_serena_serena__replace_content",
+"mcp__plugin_serena_serena__get_symbols_overview",
+"mcp__plugin_serena_serena__find_symbol",
+"mcp__plugin_serena_serena__find_referencing_symbols",
+"mcp__plugin_serena_serena__replace_symbol_body",
+"mcp__plugin_serena_serena__insert_after_symbol",
+"mcp__plugin_serena_serena__insert_before_symbol",
+"mcp__plugin_serena_serena__rename_symbol",
+"mcp__plugin_serena_serena__write_memory",
+"mcp__plugin_serena_serena__read_memory",
+"mcp__plugin_serena_serena__list_memories",
+"mcp__plugin_serena_serena__delete_memory",
+"mcp__plugin_serena_serena__edit_memory",
+"mcp__plugin_serena_serena__execute_shell_command",
+"mcp__plugin_serena_serena__search_for_pattern",
+"mcp__plugin_serena_serena__activate_project",
+"mcp__plugin_serena_serena__switch_modes",
+"mcp__plugin_serena_serena__get_current_config",
+"mcp__plugin_serena_serena__check_onboarding_performed",
+"mcp__plugin_serena_serena__onboarding",
+"mcp__plugin_serena_serena__prepare_for_new_conversation",
+"mcp__plugin_serena_serena__initial_instructions",
+"mcp__plugin_context7_context7__resolve-library-id",
+"mcp__plugin_context7_context7__query-docs"
+```
+
+### open-brain block (add whenever `open-brain` is in `claude mcp list` — should be every machine)
+
+```json
+"mcp__open-brain__capture_thought",
+"mcp__open-brain__coalesce_thoughts",
+"mcp__open-brain__delete_thought",
+"mcp__open-brain__find_similar_thoughts",
+"mcp__open-brain__list_thoughts",
+"mcp__open-brain__search_thoughts",
+"mcp__open-brain__thought_stats"
+```
+
+### perplexity block (add if `perplexity` is in `claude mcp list`)
+
+```json
+"mcp__perplexity__perplexity_ask",
+"mcp__perplexity__perplexity_reason",
+"mcp__perplexity__perplexity_research",
+"mcp__perplexity__perplexity_search"
+```
+
+---
+
+### Full template — wrap the selected blocks like this:
 
 ```json
 {
   "permissions": {
     "allow": [
-      "mcp__plugin_playwright_playwright__browser_close",
-      "mcp__plugin_playwright_playwright__browser_resize",
-      "mcp__plugin_playwright_playwright__browser_console_messages",
-      "mcp__plugin_playwright_playwright__browser_handle_dialog",
-      "mcp__plugin_playwright_playwright__browser_evaluate",
-      "mcp__plugin_playwright_playwright__browser_file_upload",
-      "mcp__plugin_playwright_playwright__browser_fill_form",
-      "mcp__plugin_playwright_playwright__browser_install",
-      "mcp__plugin_playwright_playwright__browser_press_key",
-      "mcp__plugin_playwright_playwright__browser_type",
-      "mcp__plugin_playwright_playwright__browser_navigate",
-      "mcp__plugin_playwright_playwright__browser_navigate_back",
-      "mcp__plugin_playwright_playwright__browser_network_requests",
-      "mcp__plugin_playwright_playwright__browser_run_code",
-      "mcp__plugin_playwright_playwright__browser_take_screenshot",
-      "mcp__plugin_playwright_playwright__browser_snapshot",
-      "mcp__plugin_playwright_playwright__browser_click",
-      "mcp__plugin_playwright_playwright__browser_drag",
-      "mcp__plugin_playwright_playwright__browser_hover",
-      "mcp__plugin_playwright_playwright__browser_select_option",
-      "mcp__plugin_playwright_playwright__browser_tabs",
-      "mcp__plugin_playwright_playwright__browser_wait_for",
-      "mcp__plugin_serena_serena__read_file",
-      "mcp__plugin_serena_serena__create_text_file",
-      "mcp__plugin_serena_serena__list_dir",
-      "mcp__plugin_serena_serena__find_file",
-      "mcp__plugin_serena_serena__replace_content",
-      "mcp__plugin_serena_serena__get_symbols_overview",
-      "mcp__plugin_serena_serena__find_symbol",
-      "mcp__plugin_serena_serena__find_referencing_symbols",
-      "mcp__plugin_serena_serena__replace_symbol_body",
-      "mcp__plugin_serena_serena__insert_after_symbol",
-      "mcp__plugin_serena_serena__insert_before_symbol",
-      "mcp__plugin_serena_serena__rename_symbol",
-      "mcp__plugin_serena_serena__write_memory",
-      "mcp__plugin_serena_serena__read_memory",
-      "mcp__plugin_serena_serena__list_memories",
-      "mcp__plugin_serena_serena__delete_memory",
-      "mcp__plugin_serena_serena__edit_memory",
-      "mcp__plugin_serena_serena__execute_shell_command",
-      "mcp__plugin_serena_serena__search_for_pattern",
-      "mcp__plugin_serena_serena__activate_project",
-      "mcp__plugin_serena_serena__switch_modes",
-      "mcp__plugin_serena_serena__get_current_config",
-      "mcp__plugin_serena_serena__check_onboarding_performed",
-      "mcp__plugin_serena_serena__onboarding",
-      "mcp__plugin_serena_serena__prepare_for_new_conversation",
-      "mcp__plugin_serena_serena__initial_instructions",
-      "mcp__plugin_context7_context7__resolve-library-id",
-      "mcp__plugin_context7_context7__query-docs"
+      // ... paste selected blocks here, comma-separated ...
     ]
   }
 }
 ```
 
-Tool names follow the pattern `mcp__plugin_<pluginname>_<servername>__<toolname>`. If a new plugin shows up and prompts, enumerate its tools the same way.
+(JSON doesn't actually allow comments — they're shown above for clarity. Strip them before saving.)
 
 ## glab (GitLab CLI) Quick Reference
 
