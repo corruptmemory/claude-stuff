@@ -1,5 +1,5 @@
 // Compendium entry 15: Language Evolution Features (beta 0.2.022-0.2.027)
-// Jai Compiler Version: beta 0.2.027 (7 April 2026)
+// Jai Compiler Version: beta 0.2.028 (9 April 2026)
 // Platform: Linux x86-64
 // Sources: CHANGELOG.txt (0.2.022-0.2.025), examples/dll/main.jai,
 //          modules/Overwriting_Allocator/module.jai,

@@ -1,5 +1,5 @@
 // Compendium: Operators & Casts
-// Jai Version: beta 0.2.027
+// Jai Version: beta 0.2.028
 // Platform: Linux x86-64
 // Sources: how_to/010_calling_procedures.jai
 // Use-cases: operator overloading, cast modifiers, autocast (xx),

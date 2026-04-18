@@ -1,5 +1,5 @@
 // Compendium: Directives
-// Jai Version: beta 0.2.027
+// Jai Version: beta 0.2.028
 // Platform: Linux x86-64
 // Sources: how_to/095_static_if.jai, how_to/600_insert.jai
 // Use-cases: #if, #run, #assert, #string, #char, #code, #insert,

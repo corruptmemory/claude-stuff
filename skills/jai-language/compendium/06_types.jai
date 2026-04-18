@@ -1,5 +1,5 @@
 // Compendium: Types
-// Jai Version: beta 0.2.027
+// Jai Version: beta 0.2.028
 // Platform: Linux x86-64
 // Sources: how_to/010_calling_procedures.jai, how_to/015_array_literals.jai
 // Use-cases: primitives, pointers, arrays, slices, dynamic arrays,
