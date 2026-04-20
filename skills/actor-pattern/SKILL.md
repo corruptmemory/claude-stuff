@@ -64,3 +64,86 @@ Each compendium has 4 examples: basic counter, KV store, polling, actor hierarch
 5. Build each **sub-actor** implementing Stoppable
 6. Sub-actors receive coordinator pointer; call `SetState(nextBuilder)` to trigger transitions
 7. Callers **type-switch** on the current sub-actor to decide behavior
+
+## Command shape: tagged structs, not interface.apply()
+
+The naive "command pattern" approach is one interface type per
+command with an `apply()` method:
+
+```go
+type cacheCmd interface{ apply(*cacheState) }
+type getAllCmd  struct{ result chan []Release }
+func (c *getAllCmd) apply(s *cacheState) { /* ... */ }
+```
+
+This spreads the state-mutation logic across types. Prefer a tagged
+struct with all logic co-located in `run()` as local closures that
+capture state variables:
+
+```go
+type cmdTag int
+const (cmdGetAll cmdTag = iota; cmdInvalidate; cmdStats)
+
+type cacheCmd struct {
+    tag    cmdTag
+    result chan cacheResult
+}
+
+func (c *Cache) run(ctx context.Context) {
+    var (warm bool; releases []Release; fetchedAt time.Time; lastErr error)
+
+    doFetch   := func() (int, time.Duration, error) { /* ... */ }
+    doGetAll  := func(cmd cacheCmd) { /* ... */ }
+
+    for {
+        select {
+        case cmd := <-c.cmds:
+            switch cmd.tag {
+            case cmdGetAll:  doGetAll(cmd)
+            }
+        // ...
+        }
+    }
+}
+```
+
+One function, top-to-bottom readable, state and behavior adjacent.
+
+## Testing the actor with deterministic time
+
+When the actor uses periodic refresh or timers, introduce a narrow
+`Ticker` interface rather than using `time.Ticker` directly:
+
+```go
+type Ticker interface {
+    GetTick() <-chan time.Time
+    Reset(d time.Duration)
+    Stop()
+}
+```
+
+Production uses a realTicker wrapping `time.Ticker`. Tests use a
+`ManualTicker` whose `Reset()` method is **unbuffered** — calling it
+blocks the actor until the test receives. This creates a
+rendezvous-style sync barrier:
+
+```go
+type ManualTicker struct {
+    ch          chan time.Time
+    resetCalled chan time.Duration  // unbuffered
+}
+
+func (m *ManualTicker) Reset(d time.Duration)    { m.resetCalled <- d }
+func (m *ManualTicker) AwaitReset() time.Duration { return <-m.resetCalled }
+```
+
+Tests then run deterministically without `time.Sleep`:
+
+```go
+ticker.Fire()             // push a tick
+ticker.AwaitReset()       // blocks until actor has finished the refresh
+assert state is updated   // provably post-tick
+```
+
+No polling, no races, no arbitrary timeouts. Example: `releases.Cache`
+in `idpair-inbound`.
