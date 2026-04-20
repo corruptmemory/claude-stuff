@@ -61,6 +61,29 @@ Mock implementations should be **correct enough** that business logic exercised 
 
 Observation hooks are ad-hoc: a slice of recorded calls, a channel that receives events, a counter, a callback. Whatever the test needs to verify its correctness criteria. No ceremony required.
 
+## Narrow test seams for time, randomness, and system calls
+
+When the subject-under-test reaches for a global (time.Now, rand.Read,
+os.Stdin), introduce a narrow interface at the boundary. One real
+impl, one test impl. Production passes the real one; tests pass a
+fake that exposes observation + control methods. Example from
+`idpair-inbound`:
+
+```go
+type Ticker interface {
+    GetTick() <-chan time.Time
+    Reset(d time.Duration)
+    Stop()
+}
+```
+
+The test's ManualTicker exposes `Fire()` to push a tick and
+`AwaitReset()` as a deterministic sync barrier (via unbuffered
+channel). Tests then run without `time.Sleep`.
+
+The interface should only contain methods the actor actually uses —
+not the full time.Ticker surface. YAGNI applies.
+
 ## The Single Binary Principle
 
 Every distributed application can be modeled as a single app. The default state is that the logic and coherence of the entire system can be shown to be sound, because you can run it as a single process. Not as a dozen Docker containers each running whatever was built by other teams — but something the compiler validates as a whole.
