@@ -1,7 +1,7 @@
-// Compendium entry 15: Language Evolution Features (beta 0.2.022-0.2.027)
-// Jai Compiler Version: beta 0.2.028 (9 April 2026)
+// Compendium entry 15: Language Evolution Features (beta 0.2.022-0.2.029)
+// Jai Compiler Version: beta 0.2.029
 // Platform: Linux x86-64
-// Sources: CHANGELOG.txt (0.2.022-0.2.025), examples/dll/main.jai,
+// Sources: CHANGELOG.txt (0.2.022-0.2.029), examples/dll/main.jai,
 //          modules/Overwriting_Allocator/module.jai,
 //          modules/macOS/bindings/core_foundation.jai,
 //          modules/Compiler/Compiler.jai
@@ -9,6 +9,7 @@
 // Use-cases demonstrated:
 //   - Non-dot struct literals (0.2.022)
 //   - Tagged unions: basic form (0.2.023) and with value bindings (0.2.025)
+//   - Struct literals assigning to tagged unions (0.2.029)
 //   - #elsewhere directive for external variable/procedure declarations
 //   - #code,null for null Code values
 //   - #library,no_static_library for dynamic-only libraries
@@ -106,6 +107,28 @@ demo_tagged_unions :: () {
 }
 
 // ============================================================================
+// Struct literals can assign to tagged unions (NEW in beta 0.2.029)
+// ============================================================================
+// Source: CHANGELOG.txt beta 0.2.029
+// Previously you had to set the tag and field separately.
+// Now a struct literal can be used directly in an assignment.
+
+demo_tagged_union_struct_literal :: () {
+    t: Thing;
+
+    // Old way (still works):
+    t.fruit = .BANANA;
+    t.y = 2.71;
+
+    // New way (0.2.029): struct literal assignment
+    t = .{ fruit = .APPLE, x = 99 };
+    print("struct literal assign: fruit=%, x=%\n", t.fruit, t.x);
+
+    t = .{ fruit = .BANANA, y = 1.41 };
+    print("struct literal assign: fruit=%, y=%\n", t.fruit, t.y);
+}
+
+// ============================================================================
 // #code,null — null value for Code-typed parameters
 // ============================================================================
 // Source: modules/Compiler/Compiler.jai, examples/codex_view/src/draw_live_allocations.jai
@@ -174,6 +197,8 @@ main :: () {
     demo_non_dot_struct_literals();
     print("\n=== Tagged unions ===\n");
     demo_tagged_unions();
+    print("\n=== Tagged union struct literal assignment (0.2.029) ===\n");
+    demo_tagged_union_struct_literal();
     print("\n=== #code,null ===\n");
     demo_code_null();
     print("\n=== Dereference (new style) ===\n");

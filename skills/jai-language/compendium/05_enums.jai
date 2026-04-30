@@ -1,5 +1,5 @@
 // Compendium: Enums
-// Jai Version: beta 0.2.028
+// Jai Version: beta 0.2.029
 // Platform: Linux x86-64
 // Sources: how_to/013_enums.jai, how_to/014_enum_unary_dot.jai
 // Use-cases: basic enum, backing type, explicit values, enum_flags,

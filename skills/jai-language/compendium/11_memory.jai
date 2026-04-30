@@ -1,9 +1,10 @@
 // Compendium: Memory Management
-// Jai Version: beta 0.2.028
+// Jai Version: beta 0.2.029
 // Platform: Linux x86-64
 // Sources: how_to/200_memory_management.jai, how_to/012_temporary_storage.jai
 // Use-cases: New, alloc, free, temporary_storage, push_allocator,
-//   context allocator, dynamic arrays, resizable
+//   context allocator, dynamic arrays, resizable,
+//   array_find/add_if_unique/unordered_remove_by_value with optional compare() (0.2.029)
 
 #import "Basic";
 
@@ -69,4 +70,52 @@ main :: () {
     // array_unordered_remove is O(1) but changes order
     array_add(*data, 400);
     print("before unordered remove: %\n", data);
+
+    // -------------------------------------------------------------------------
+    // array_find / array_add_if_unique / array_unordered_remove_by_value
+    // with optional $compare argument (NEW in beta 0.2.029)
+    // -------------------------------------------------------------------------
+    // The $compare parameter is compile-time baked ($ prefix = baked constant).
+    // When null (the default), == is used. Supply a procedure to override.
+    // The motivating use case: structs where equality is on one field only.
+
+    // Without compare: uses operator == (works for int, string, etc.)
+    numbers: [..] int;
+    defer array_free(numbers);
+    array_add(*numbers, 10);
+    array_add(*numbers, 20);
+    array_add(*numbers, 30);
+
+    found2, idx := array_find(numbers, 20);
+    print("array_find 20: found=%, index=%\n", found2, idx);
+
+    // array_add_if_unique: only adds if not already present
+    added, idx2 := array_add_if_unique(*numbers, 20);   // already there
+    print("add_if_unique 20: added=%, index=%\n", added, idx2);
+    added, idx2  = array_add_if_unique(*numbers, 99);   // new
+    print("add_if_unique 99: added=%, index=%\n", added, idx2);
+
+    // With custom compare: find a struct by a single field
+    Record :: struct { id: int; name: string; }
+
+    records: [..] Record;
+    defer array_free(records);
+    array_add(*records, .{ id = 1, name = "alice" });
+    array_add(*records, .{ id = 2, name = "bob"   });
+    array_add(*records, .{ id = 3, name = "carol"  });
+
+    // Match on id only — name field is irrelevant for equality here
+    same_id :: (a: Record, b: Record) -> bool { return a.id == b.id; }
+
+    found3, pos := array_find(records, .{ id = 2, name = "" }, same_id);
+    print("find by id=2: found=%, index=%\n", found3, pos);
+
+    // array_add_if_unique with custom compare: deduplicate by id
+    added2, _ := array_add_if_unique(*records, .{ id = 2, name = "different" }, same_id);
+    print("add_if_unique id=2 (dup): added=%\n", added2);   // false
+
+    // array_unordered_remove_by_value with custom compare
+    removed := array_unordered_remove_by_value(*records, .{ id = 1, name = "" }, stop_after_first = true, same_id);
+    print("removed %  record(s) with id=1\n", removed);
+    print("records after remove: count=%\n", records.count);
 }

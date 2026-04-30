@@ -1,5 +1,5 @@
 // Compendium entry 18: #elsewhere Directive and Backslash Identifiers
-// Jai Compiler Version: beta 0.2.028 (9 April 2026)
+// Jai Compiler Version: beta 0.2.029 (9 April 2026)
 // Platform: Linux x86-64
 // Sources: examples/dll/main.jai, modules/macOS/bindings/core_foundation.jai,
 //          modules/POSIX/bindings/linux/stdio.jai, modules/POSIX/bindings/linux/base.jai,

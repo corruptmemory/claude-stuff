@@ -1,5 +1,5 @@
 // Compendium: Special Syntax
-// Jai Version: beta 0.2.028
+// Jai Version: beta 0.2.029
 // Platform: Linux x86-64
 // Sources: how_to/014_enum_unary_dot.jai, how_to/019_looping.jai
 // Use-cases: unary dot, spread, comma-comma, backtick, notes,

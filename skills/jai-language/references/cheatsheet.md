@@ -1,9 +1,9 @@
 # Jai Language Cheat Sheet
 
-> **Jai Version**: beta 0.2.028 (9 April 2026)
+> **Jai Version**: beta 0.2.029
 > **Platform**: Linux x86-64
 > **All entries verified against**: `~/jai/jai/` distribution (how_to/, modules/, examples/)
-> **Last updated**: 2026-04-17
+> **Last updated**: 2026-04-30
 
 ## Ecosystem Context
 
@@ -173,6 +173,7 @@ operator- :: Basic.operator-;          // import operator from another module
 - `int` (s64), `u8` `u16` `u32` `u64`, `s8` `s16` `s32` `s64`
 - `float` (float32), `float32`, `float64`
 - `bool`, `string`, `void`
+- **`void` is the zero `Type`** (since 0.2.029): A `Type` variable declared without initialization holds `void` (not undefined). `void` evaluates as `false` in if-statements; all other types evaluate as `true`. `void` is always index 0 in both compile-time and runtime type tables; `Type` is always index 1. Previously a zero-initialized `Type` was undefined behavior at compile time.
 - `#Context` — the type of the implicit context parameter
   - Used as a type: `ctx: #Context;`, `cast(*#Context) ptr`
   - Used as a namespace: `#Context.default_allocator` (static member access)
@@ -428,6 +429,9 @@ Thing :: union fruit: Fruit {
     .ORANGE ,, z := "text";
 }
 // NOTE: ,, syntax for bindings is experimental and may change (case keyword considered)
+// Struct literals can now be used to ASSIGN to tagged unions (0.2.029):
+//   t = .{ .BANANA, y = 3.14 };    // assign-via-literal syntax
+// Source: CHANGELOG.txt beta 0.2.029
 // IMPORTANT: Each variant supports exactly ONE field binding. Multi-field variants
 // require a wrapper struct. Source: jai-wayland code generator (2026-04-03).
 // Example workaround for multi-field event data:
@@ -1348,6 +1352,7 @@ context.allocator = my_allocator;      // modify directly
 | `#v2` for-loop directive | 0.2.019 | Remove (transition aid, no longer needed) |
 | enum `.loose` member | 0.2.022 | Use metaprogramming |
 | `Code_Directive_Place` | 0.2.027 | Removed from `modules/Compiler/Compiler.jai` |
+| `__temporary_allocator` (Basic) | 0.2.029 | Use `temporary_allocator` or `temp` |
 
 ### Deprecated Features
 | Feature | Deprecated In | Will Be Removed | Replacement |
@@ -1360,10 +1365,16 @@ context.allocator = my_allocator;      // modify directly
 | `#foreign_library` | ~0.2.015 | Removed 0.2.025 | `#library` |
 | `#foreign_system_library` | ~0.2.015 | Removed 0.2.025 | `#library,system` |
 | `modules/File_Async` | 0.2.025 | Removed 0.2.026 | Copy from older beta if needed |
+| `Hash_Table.init()` | 0.2.029 | Future | Not needed; use `table_resize()` for explicit sizing |
 
 ### New Features (by version)
 | Feature | Added In | Notes |
 |---------|----------|-------|
+| `void` as zero `Type` value | 0.2.029 | Uninitialized `Type` holds `void`; `void` is `false` in if; index 0 in type tables |
+| Struct literals assign to tagged unions | 0.2.029 | `t = .{ .TAG, field = val };` |
+| `Hash_Table.table_reset_keeping_memory()` | 0.2.029 | Old `table_reset()` behavior (clear count, keep memory) |
+| `Hash_Table.table_resize()` | 0.2.029 | Explicit table size pre-allocation |
+| `array_find/add_if_unique/unordered_remove_by_value` optional `compare()` | 0.2.029 | Compile-time baked comparator arg |
 | Non-dot struct literals `{3, 4}` | 0.2.022 | Instead of `.{3, 4}` |
 | Tagged unions `union tag: T {}` | 0.2.023 | Tag must be integer or Type |
 | Tagged union bindings `.VAL ,, field` | 0.2.025 | Experimental, syntax may change |
@@ -1375,6 +1386,11 @@ context.allocator = my_allocator;      // modify directly
 | `#bytes` standalone directive | pre-0.2.025 | Raw machine code bytes, not limited to `#asm` |
 | Bare `remove;` statement | pre-0.2.025 | Removes current iterator (implicit `it`) |
 | print() tagged union display | 0.2.026 | Prints as `{TAG, value}`, cross-refs correct field |
+
+### Breaking Changes (behavior changes without syntax change)
+| Change | Version | Old Behavior | New Behavior |
+|--------|---------|--------------|--------------|
+| `Hash_Table.table_reset()` | 0.2.029 | Reset count, keep allocated memory | Free memory + reset (like `array_reset`) |
 
 ## Tree-Sitter Grammar Issues (tracked for parser development)
 <!-- verified: beta 0.2.028 -->

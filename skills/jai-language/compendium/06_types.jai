@@ -1,5 +1,5 @@
 // Compendium: Types
-// Jai Version: beta 0.2.028
+// Jai Version: beta 0.2.029
 // Platform: Linux x86-64
 // Sources: how_to/010_calling_procedures.jai, how_to/015_array_literals.jai
 // Use-cases: primitives, pointers, arrays, slices, dynamic arrays,
@@ -75,4 +75,21 @@ main :: () {
     // Distinct type
     distance : Meters = 5.0;
     print("distance = %\n", distance);
+
+    // void as zero Type (NEW in beta 0.2.029)
+    // An uninitialized Type variable holds void (not undefined).
+    // void evaluates as false in if-statements; all other Types are true.
+    // void is always index 0 in the type table; Type is always index 1.
+    t : Type;                              // zero-initialized → void
+    if t  print("t is non-void\n");
+    else  print("t is void (zero-initialized Type)\n");  // prints this
+
+    t = int;
+    if t  print("t = int (truthy)\n");    // prints this
+
+    // void is index 0 in the runtime type table
+    void_info := type_info(void);
+    int_info   := type_info(int);
+    print("void type_info: %\n", void_info);
+    print("int  type_info: %\n", int_info);
 }
