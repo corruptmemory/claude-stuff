@@ -137,6 +137,81 @@ find ~/.claude/plugins/cache -path '*/playwright/*/.mcp.json'
 
 **Never** run `npx playwright install` — it tries to install Chrome and fails on Arch. The `--executable-path` flag is discovered via `npx @playwright/mcp@latest --help`.
 
+## chrome-devtools-mcp + WebMCP — install on every Brave machine
+
+Brave 148+ ships the WebMCP browser API (`navigator.modelContext`, `navigator.modelContextTesting`) behind a single `chrome://flags` toggle. To let Claude Code drive a WebMCP-aware page through that Brave, you need three pieces wired together: Brave running with the flag on and `--remote-debugging-port=9222`, the `chrome-devtools-mcp` plugin installed, and the plugin's cached manifest hand-patched to point at your Brave on that port. **The patch matters** — by default the plugin spawns its own Puppeteer-managed Chrome that does NOT have the WebMCP flag, so without step 4 below you get generic devtools against a throwaway browser instead of WebMCP against your actual Brave.
+
+### Bootstrap order (per machine)
+
+```bash
+# 1. Enable the chrome://flags toggle (once).
+#    In Brave: chrome://flags#enable-webmcp-testing → Enabled → Relaunch.
+#    Verify (Brave can be running):
+jq -r '.browser.enabled_labs_experiments[]' \
+    ~/.config/BraveSoftware/Brave-Browser/Local\ State | grep webmcp
+# expect: enable-webmcp-testing@1
+
+# 2. Make sure Brave is launched with --remote-debugging-port=9222.
+#    Typically baked into your launcher .desktop file or window-manager config.
+#    Verify:
+curl -s http://127.0.0.1:9222/json/version | jq -r .Browser
+# expect: Chrome/148.x.x.x (or newer)
+
+# 3. Install the plugin (user-scope auto-applied).
+claude plugin install chrome-devtools-mcp
+
+# 4. Hand-patch the cached manifests to point at the running Brave.
+#    The upstream plugin manifest in claude-plugins-official 1.0.1 dropped the
+#    default --browserUrl arg, so without this patch the plugin spawns its own
+#    (flagless) Puppeteer Chrome.  Idempotent — safe to re-run after updates.
+for DIR in ~/.claude/plugins/cache/claude-plugins-official/chrome-devtools-mcp/*/; do
+    for f in "${DIR}.mcp.json" "${DIR}.claude-plugin/plugin.json"; do
+        jq '.mcpServers["chrome-devtools"].args |=
+            (. - ["--browserUrl", "http://127.0.0.1:9222"])
+            + ["--browserUrl", "http://127.0.0.1:9222"]' \
+            "$f" > "$f.new" && mv "$f.new" "$f"
+    done
+done
+
+# 5. Restart any running Claude Code session — MCP servers are launched once
+#    per session and won't pick up the new args until relaunch.
+
+# 6. Verify the plugin connects through to your Brave (not its own Chrome).
+claude mcp list | grep chrome-devtools
+# expect: plugin:chrome-devtools-mcp:chrome-devtools: npx chrome-devtools-mcp@latest --browserUrl http://127.0.0.1:9222 - ✓ Connected
+```
+
+### Verify WebMCP is actually exposed in Brave
+
+Direct CDP probe via Node's built-in `WebSocket` (Node 21+, no npm deps). Open any real (non-`chrome://`) page in Brave first:
+
+```bash
+node -e '
+(async () => {
+  const targets = (await (await fetch("http://127.0.0.1:9222/json")).json())
+    .filter(t => t.type === "page" && !t.url.startsWith("chrome://") && t.webSocketDebuggerUrl);
+  if (!targets.length) { console.log("Open a real page in Brave first."); return; }
+  const ws = new WebSocket(targets[0].webSocketDebuggerUrl);
+  await new Promise(r => ws.addEventListener("open", r, {once: true}));
+  ws.send(JSON.stringify({id: 1, method: "Runtime.evaluate", params: {
+    expression: "JSON.stringify({mc: typeof navigator.modelContext, mct: typeof navigator.modelContextTesting})",
+    returnByValue: true,
+  }}));
+  const msg = await new Promise(r => ws.addEventListener("message", e => r(JSON.parse(e.data)), {once: true}));
+  console.log(msg.result.result.value);
+  ws.close();
+})();
+'
+# expect: {"mc":"object","mct":"object"}
+```
+
+### Gotchas
+
+- **The cache patch is fragile.** `claude plugin update chrome-devtools-mcp` will overwrite both `.mcp.json` and `.claude-plugin/plugin.json` from upstream. Re-run step 4 after every plugin update. Long-term fix: either the upstream marketplace pin needs to restore the `--browserUrl` default, or the plugin manifest needs a `userConfig` section so `settings.json -> pluginConfigs.chrome-devtools-mcp@claude-plugins-official.mcpServers.chrome-devtools` can override the args durably. Worth a PR upstream when motivated.
+- **Don't add `--categoryExperimentalWebmcp` to the args on Brave 148.** That flag enables a dedicated WebMCP tool category inside chrome-devtools-mcp but requires Chromium 149+ AND a `DevToolsWebMCPSupport` feature flag that Brave 148 doesn't expose. Add it when Brave updates past 149.
+- **`evaluate_script` is the working path on Brave 148.** Anything you can do via direct CDP JS eval against `navigator.modelContext` / `navigator.modelContextTesting`, the plugin can do via its `evaluate_script` tool. That's sufficient for WebMCP-aware pages today.
+- **Permissions:** Don't forget to add the **chrome-devtools-mcp block** to `.claude/settings.local.json` per project — see the next section.
+
 ## MCP Plugin Permissions (stop the prompting)
 
 The `mcp__*` wildcard in global `settings.json` does NOT actually suppress prompts for MCP tools. You must enumerate every tool explicitly in `.claude/settings.local.json` per project.
@@ -147,7 +222,8 @@ The `mcp__*` wildcard in global `settings.json` does NOT actually suppress promp
 2. Always include the **Base plugins block** below (playwright + serena + context7).
 3. **ALWAYS** check for `open-brain` in `claude mcp list`. If present (expected on every machine — see the "Open Brain" section), add the **open-brain block**. If it's *missing*, stop and bootstrap open-brain before continuing — a machine without open-brain is amnesiac relative to the rest of the fleet.
 4. Check for `perplexity` in `claude mcp list`. If present, add the **perplexity block**.
-5. If any other MCP server shows up that prompts during use, enumerate its tools the same way and consider whether it's worth adding to this recipe for future projects.
+5. Check for `plugin:chrome-devtools-mcp:chrome-devtools` in `claude mcp list`. If present (expected on every machine with a debug-enabled Brave — see the "chrome-devtools-mcp + WebMCP" section above), add the **chrome-devtools-mcp block**.
+6. If any other MCP server shows up that prompts during use, enumerate its tools the same way and consider whether it's worth adding to this recipe for future projects.
 
 Tool names follow the pattern `mcp__plugin_<pluginname>_<servername>__<toolname>` for plugin-hosted servers, or `mcp__<servername>__<toolname>` for directly-registered servers (like open-brain and perplexity — these were added via `claude mcp add`, not via the plugin system, so they skip the `plugin_` infix).
 
@@ -229,6 +305,40 @@ Tool names follow the pattern `mcp__plugin_<pluginname>_<servername>__<toolname>
 "mcp__perplexity__perplexity_search"
 ```
 
+### chrome-devtools-mcp block (add when `plugin:chrome-devtools-mcp:chrome-devtools` is in `claude mcp list`)
+
+```json
+"mcp__plugin_chrome-devtools-mcp_chrome-devtools__click",
+"mcp__plugin_chrome-devtools-mcp_chrome-devtools__close_page",
+"mcp__plugin_chrome-devtools-mcp_chrome-devtools__drag",
+"mcp__plugin_chrome-devtools-mcp_chrome-devtools__emulate",
+"mcp__plugin_chrome-devtools-mcp_chrome-devtools__evaluate_script",
+"mcp__plugin_chrome-devtools-mcp_chrome-devtools__fill",
+"mcp__plugin_chrome-devtools-mcp_chrome-devtools__fill_form",
+"mcp__plugin_chrome-devtools-mcp_chrome-devtools__get_console_message",
+"mcp__plugin_chrome-devtools-mcp_chrome-devtools__get_network_request",
+"mcp__plugin_chrome-devtools-mcp_chrome-devtools__handle_dialog",
+"mcp__plugin_chrome-devtools-mcp_chrome-devtools__hover",
+"mcp__plugin_chrome-devtools-mcp_chrome-devtools__lighthouse_audit",
+"mcp__plugin_chrome-devtools-mcp_chrome-devtools__list_console_messages",
+"mcp__plugin_chrome-devtools-mcp_chrome-devtools__list_network_requests",
+"mcp__plugin_chrome-devtools-mcp_chrome-devtools__list_pages",
+"mcp__plugin_chrome-devtools-mcp_chrome-devtools__navigate_page",
+"mcp__plugin_chrome-devtools-mcp_chrome-devtools__new_page",
+"mcp__plugin_chrome-devtools-mcp_chrome-devtools__performance_analyze_insight",
+"mcp__plugin_chrome-devtools-mcp_chrome-devtools__performance_start_trace",
+"mcp__plugin_chrome-devtools-mcp_chrome-devtools__performance_stop_trace",
+"mcp__plugin_chrome-devtools-mcp_chrome-devtools__press_key",
+"mcp__plugin_chrome-devtools-mcp_chrome-devtools__resize_page",
+"mcp__plugin_chrome-devtools-mcp_chrome-devtools__select_page",
+"mcp__plugin_chrome-devtools-mcp_chrome-devtools__take_memory_snapshot",
+"mcp__plugin_chrome-devtools-mcp_chrome-devtools__take_screenshot",
+"mcp__plugin_chrome-devtools-mcp_chrome-devtools__take_snapshot",
+"mcp__plugin_chrome-devtools-mcp_chrome-devtools__type_text",
+"mcp__plugin_chrome-devtools-mcp_chrome-devtools__upload_file",
+"mcp__plugin_chrome-devtools-mcp_chrome-devtools__wait_for"
+```
+
 ---
 
 ### Full template — wrap the selected blocks like this:
@@ -301,8 +411,6 @@ marksnip clip --json
 ## Claude in Chrome (NOT WORKING on Brave — skip)
 
 Claude in Chrome does not work on Brave due to a server-side feature flag (`chrome_ext_bridge_enabled`) that Anthropic only enables for Chrome and Edge. The extension installs fine but the WebSocket bridge to `bridge.claudeusercontent.com` never connects. Use marksnip instead for all web reading tasks.
-
-## playwright-cli (fallback browser automation)
 
 ## playwright-cli (fallback browser automation)
 
