@@ -223,9 +223,10 @@ The `mcp__*` wildcard in global `settings.json` does NOT actually suppress promp
 3. **ALWAYS** check for `open-brain` in `claude mcp list`. If present (expected on every machine — see the "Open Brain" section), add the **open-brain block**. If it's *missing*, stop and bootstrap open-brain before continuing — a machine without open-brain is amnesiac relative to the rest of the fleet.
 4. Check for `perplexity` in `claude mcp list`. If present, add the **perplexity block**.
 5. Check for `plugin:chrome-devtools-mcp:chrome-devtools` in `claude mcp list`. If present (expected on every machine with a debug-enabled Brave — see the "chrome-devtools-mcp + WebMCP" section above), add the **chrome-devtools-mcp block**.
-6. If any other MCP server shows up that prompts during use, enumerate its tools the same way and consider whether it's worth adding to this recipe for future projects.
+6. **If you're running inside Emacs** (the `claude-code-ide.el` bridge — you'll see a "Connected to Emacs via claude-code-ide.el integration" line in the environment, and/or `ide` + `emacs-tools` show up as `mcp__ide__*` / `mcp__emacs-tools__*` tools), add the **emacs bridge block**. NOTE: these two servers do **NOT** appear in `claude mcp list` — they're injected live by the IDE bridge when Emacs connects, not registered via `claude mcp add`. Confirm presence instead by checking the environment banner or by running a trivial `mcp__ide__executeCode` eval like `(emacs-version)`.
+7. If any other MCP server shows up that prompts during use, enumerate its tools the same way and consider whether it's worth adding to this recipe for future projects.
 
-Tool names follow the pattern `mcp__plugin_<pluginname>_<servername>__<toolname>` for plugin-hosted servers, or `mcp__<servername>__<toolname>` for directly-registered servers (like open-brain and perplexity — these were added via `claude mcp add`, not via the plugin system, so they skip the `plugin_` infix).
+Tool names follow the pattern `mcp__plugin_<pluginname>_<servername>__<toolname>` for plugin-hosted servers, or `mcp__<servername>__<toolname>` for directly-registered servers (like open-brain and perplexity — these were added via `claude mcp add`, not via the plugin system, so they skip the `plugin_` infix). The Emacs bridge servers (`ide`, `emacs-tools`) also use the no-`plugin_` form because they're injected by the IDE integration rather than the plugin system.
 
 ---
 
@@ -331,13 +332,29 @@ Tool names follow the pattern `mcp__plugin_<pluginname>_<servername>__<toolname>
 "mcp__plugin_chrome-devtools-mcp_chrome-devtools__press_key",
 "mcp__plugin_chrome-devtools-mcp_chrome-devtools__resize_page",
 "mcp__plugin_chrome-devtools-mcp_chrome-devtools__select_page",
-"mcp__plugin_chrome-devtools-mcp_chrome-devtools__take_memory_snapshot",
+"mcp__plugin_chrome-devtools-mcp_chrome-devtools__take_heapsnapshot",
 "mcp__plugin_chrome-devtools-mcp_chrome-devtools__take_screenshot",
 "mcp__plugin_chrome-devtools-mcp_chrome-devtools__take_snapshot",
 "mcp__plugin_chrome-devtools-mcp_chrome-devtools__type_text",
 "mcp__plugin_chrome-devtools-mcp_chrome-devtools__upload_file",
 "mcp__plugin_chrome-devtools-mcp_chrome-devtools__wait_for"
 ```
+
+### emacs bridge block (add when running inside Emacs via `claude-code-ide.el`)
+
+Two servers, one integration. The `ide` server is the core bridge — `executeCode` evaluates **arbitrary elisp** in the host Emacs (anything Emacs can do: buffer ops, `project.el`, `compile`, even the functions the `emacs-tools` helpers wrap), and `getDiagnostics` surfaces flycheck/flymake. The `emacs-tools` server is ergonomic, pre-shaped navigation (imenu / xref / tree-sitter / project-info). Neither shows in `claude mcp list` (IDE-injected, not `claude mcp add`'d), so gate on "am I in Emacs?" not on the server list. Both use the no-`plugin_` infix.
+
+```json
+"mcp__ide__executeCode",
+"mcp__ide__getDiagnostics",
+"mcp__emacs-tools__claude-code-ide-mcp-imenu-list-symbols",
+"mcp__emacs-tools__claude-code-ide-mcp-project-info",
+"mcp__emacs-tools__claude-code-ide-mcp-treesit-info",
+"mcp__emacs-tools__claude-code-ide-mcp-xref-find-apropos",
+"mcp__emacs-tools__claude-code-ide-mcp-xref-find-references"
+```
+
+**Caveat:** `executeCode` runs in your *live* Emacs session, not a sandbox — elisp side effects hit the editor directly. Keep evals read-only unless a task explicitly calls for buffer/state mutation.
 
 ---
 
