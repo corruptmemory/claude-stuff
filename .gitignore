@@ -2,9 +2,11 @@
 .credentials.json
 
 # Transient caches and state
+.last-cleanup
 cache/
 debug/
 file-history/
+ide/
 paste-cache/
 plans/
 plugins/
