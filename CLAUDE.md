@@ -528,3 +528,38 @@ log-dominant. Mechanical exception: a `#c_call` / no-`context` callback can't re
 `print` there.
 
 This serves a hard standard: **no silent failures, ever.**
+
+**Testing corollary.** Because errors route through the pluggable context logger, a test is just
+another logger-context: install an error-recording logger around the code under test and errors
+become an assertable side-channel — testable even for **void functions** with no error return.
+
+- *Positive test* (no error expected): record `.ERROR`; fail if any were logged. Make this the
+  default harness behavior so 'no unexpected errors' is a free, suite-wide assertion; it also catches
+  errors a function deliberately swallows-and-continues.
+- *Negative test* (error expected): assert the expected error fired, proving the failure path behaves
+  as designed. Match on a STABLE handle (`Log_Info.user_flags` / `section` / `source_identifier`),
+  not the brittle human message string.
+
+Blind spot: the `#c_call` / no-`context` `print` exception bypasses the logger, so errors there are
+not captured. Reference recorder (Jai; Odin's `context.logger` is analogous):
+
+```jai
+Error_Recorder :: struct { errors: [..] string; }
+
+record_errors :: (message: string, data: *void, info: Log_Info) {
+    if info.common_flags & .ERROR {
+        rec := cast(*Error_Recorder) data;
+        array_add(*rec.errors, copy_string(message));
+    }
+}
+
+// around the code under test:
+rec: Error_Recorder;
+ctx := context;
+ctx.logger      = record_errors;
+ctx.logger_data = *rec;
+push_context ctx {
+    thing_under_test();           // even with no return value
+}
+assert(rec.errors.count == 0);    // positive test; invert the assertion for negative tests
+```
