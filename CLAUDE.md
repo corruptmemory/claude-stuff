@@ -223,10 +223,9 @@ The `mcp__*` wildcard in global `settings.json` does NOT actually suppress promp
 3. **ALWAYS** check for `open-brain` in `claude mcp list`. If present (expected on every machine — see the "Open Brain" section), add the **open-brain block**. If it's *missing*, stop and bootstrap open-brain before continuing — a machine without open-brain is amnesiac relative to the rest of the fleet.
 4. Check for `perplexity` in `claude mcp list`. If present, add the **perplexity block**.
 5. Check for `plugin:chrome-devtools-mcp:chrome-devtools` in `claude mcp list`. If present (expected on every machine with a debug-enabled Brave — see the "chrome-devtools-mcp + WebMCP" section above), add the **chrome-devtools-mcp block**.
-6. **If you're running inside Emacs** (the `claude-code-ide.el` bridge — you'll see a "Connected to Emacs via claude-code-ide.el integration" line in the environment, and/or `ide` + `emacs-tools` show up as `mcp__ide__*` / `mcp__emacs-tools__*` tools), add the **emacs bridge block**. NOTE: these two servers do **NOT** appear in `claude mcp list` — they're injected live by the IDE bridge when Emacs connects, not registered via `claude mcp add`. Confirm presence instead by checking the environment banner or by running a trivial `mcp__ide__executeCode` eval like `(emacs-version)`.
-7. If any other MCP server shows up that prompts during use, enumerate its tools the same way and consider whether it's worth adding to this recipe for future projects.
+6. If any other MCP server shows up that prompts during use, enumerate its tools the same way and consider whether it's worth adding to this recipe for future projects.
 
-Tool names follow the pattern `mcp__plugin_<pluginname>_<servername>__<toolname>` for plugin-hosted servers, or `mcp__<servername>__<toolname>` for directly-registered servers (like open-brain and perplexity — these were added via `claude mcp add`, not via the plugin system, so they skip the `plugin_` infix). The Emacs bridge servers (`ide`, `emacs-tools`) also use the no-`plugin_` form because they're injected by the IDE integration rather than the plugin system.
+Tool names follow the pattern `mcp__plugin_<pluginname>_<servername>__<toolname>` for plugin-hosted servers, or `mcp__<servername>__<toolname>` for directly-registered servers (like open-brain and perplexity — these were added via `claude mcp add`, not via the plugin system, so they skip the `plugin_` infix).
 
 ---
 
@@ -339,22 +338,6 @@ Tool names follow the pattern `mcp__plugin_<pluginname>_<servername>__<toolname>
 "mcp__plugin_chrome-devtools-mcp_chrome-devtools__upload_file",
 "mcp__plugin_chrome-devtools-mcp_chrome-devtools__wait_for"
 ```
-
-### emacs bridge block (add when running inside Emacs via `claude-code-ide.el`)
-
-Two servers, one integration. The `ide` server is the core bridge — `executeCode` evaluates **arbitrary elisp** in the host Emacs (anything Emacs can do: buffer ops, `project.el`, `compile`, even the functions the `emacs-tools` helpers wrap), and `getDiagnostics` surfaces flycheck/flymake. The `emacs-tools` server is ergonomic, pre-shaped navigation (imenu / xref / tree-sitter / project-info). Neither shows in `claude mcp list` (IDE-injected, not `claude mcp add`'d), so gate on "am I in Emacs?" not on the server list. Both use the no-`plugin_` infix.
-
-```json
-"mcp__ide__executeCode",
-"mcp__ide__getDiagnostics",
-"mcp__emacs-tools__claude-code-ide-mcp-imenu-list-symbols",
-"mcp__emacs-tools__claude-code-ide-mcp-project-info",
-"mcp__emacs-tools__claude-code-ide-mcp-treesit-info",
-"mcp__emacs-tools__claude-code-ide-mcp-xref-find-apropos",
-"mcp__emacs-tools__claude-code-ide-mcp-xref-find-references"
-```
-
-**Caveat:** `executeCode` runs in your *live* Emacs session, not a sandbox — elisp side effects hit the editor directly. Keep evals read-only unless a task explicitly calls for buffer/state mutation.
 
 ---
 
@@ -516,3 +499,32 @@ These tools are installed on all machines and can be used freely:
 - **CLI arguments over environment variables** — environment variables are the devil because there's no tooling to ask an arbitrary program "what environment variables do you look at?" Any sane CLI-driven program can tell you what arguments it accepts. Use CLI flags with sensible (or sensibly derived) defaults. It's fine to reach into a shared TOML config for values that are too cumbersome for a CLI invocation, but the config file path itself should be a CLI flag.
 - Keep things simple — no over-abstraction, no unnecessary dependencies
 - Tests should be straightforward table-driven or sequential, using `t.TempDir()` for isolation
+
+## Output discipline — `print` vs `log`/`log_error` (Jai, Odin, native projects)
+
+The choice between `print` and `log`/`log_error` is decided by **suppressibility**, not by file
+type ("library vs example" is just a frequent consequence):
+
+- **`print`** — first-class / expected output: a human, or a log entry / enclosing script, will
+  almost certainly consume it (a tool's results, a CLI's usage/progress, a test's pass/fail). Test:
+  *if a no-op logger dropped this line, would the tool fail its contract or someone reasonably
+  complain?* Yes → `print`.
+- **`log`** — elective output a quiet logger could drop with nobody reasonably complaining (runtime
+  diagnostics, debug dumps, status chatter). The only quietable tier is plain `log` (INFO).
+- **`log_error`** — a **failure**, handed to the context's logger, which OWNS where it goes and how
+  it is surfaced. **Never suppressed.** The logger is a build/context decision: in a dev build it may
+  just hit stderr, but a release logger's contract is *the failure WILL reach the user* — log file,
+  OS log, and, as the fallback that matters, an **emergency lowest-common-denominator GUI surface** (a
+  message box). A GUI/game user never had a terminal open; a failed Vulkan init on release must TELL
+  them, not die silently. The silent-failing Steam game is the anti-pattern we refuse. `.WARNING`
+  likewise always emits; only INFO is quietable.
+
+`print` and `log_error` both always reach a human, but are not interchangeable: `print` is the
+intended deliverable (hardwired to stdout, no surfacing policy); `log_error` hands a failure to the
+logger whose policy is "never silent." That is the whole reason errors route through `log_error`
+rather than `print` or a raw write. Classify per the program's *contract*, not the message text —
+CLI / CLI-GUI hybrids are print-dominant (most output is first-class); GUIs/games and libraries are
+log-dominant. Mechanical exception: a `#c_call` / no-`context` callback can't reach `log*`, so
+`print` there.
+
+This serves a hard standard: **no silent failures, ever.**
