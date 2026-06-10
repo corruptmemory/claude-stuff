@@ -536,9 +536,12 @@ become an assertable side-channel — testable even for **void functions** with 
 - *Positive test* (no error expected): record `.ERROR`; fail if any were logged. Make this the
   default harness behavior so 'no unexpected errors' is a free, suite-wide assertion; it also catches
   errors a function deliberately swallows-and-continues.
-- *Negative test* (error expected): assert the expected error fired, proving the failure path behaves
-  as designed. Match on a STABLE handle (`Log_Info.user_flags` / `section` / `source_identifier`),
-  not the brittle human message string.
+- *Negative test* (error expected): a spectrum, cheapest rung first — *an error fired*
+  (`rec.errors.count > 0`) is the robust default (immune to message drift, but can false-green if an
+  UNRELATED error masked the one you meant to test); climb to a STABLE handle
+  (`Log_Info.user_flags` / `section` / `source_identifier`) when identity matters; message-string
+  matching is the brittle last resort but still a usable hook. The discipline guarantees the hook
+  exists for free; how tightly you grab it is a per-test dial.
 
 Blind spot: the `#c_call` / no-`context` `print` exception bypasses the logger, so errors there are
 not captured. Reference recorder (Jai; Odin's `context.logger` is analogous):
