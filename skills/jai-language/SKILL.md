@@ -14,6 +14,11 @@ The Jai compiler distribution at `~/jai/jai/` contains the authoritative source:
 
 See [references/cheatsheet.md](references/cheatsheet.md) for the full language cheat sheet.
 See [compendium/](compendium/) for compilable code samples demonstrating every language feature (19 files).
+See [references/build-variables-recipe.md](references/build-variables-recipe.md) for the canonical
+metaprogram recipe for custom compile-time build variables (`#placeholder` knobs module +
+`Message_Import`-scoped `add_build_string`) — including the beta 0.2.029 gated-`#load` bug the
+naive per-file injection hits. Use this recipe whenever a metaprogram needs to feed constants
+into target code.
 
 ## Compendium verification requirement
 
