@@ -1338,6 +1338,42 @@ push_context new_ctx {                 // switch context for scope
 context.allocator = my_allocator;      // modify directly
 ```
 
+### Context handoff across thread / non-Jai boundaries
+
+`context` is passed only between ordinary Jai procs. It does NOT cross a thread
+boundary, and a `#c_call` proc (the shape a C library calls back into) gets NO
+context at all. To allocate / `log` / `tprint` / call a context-taking proc there,
+hand-roll the handoff — the standard-library idiom (`modules/Thread/primitives.jai`,
+`starting_context`):
+
+```jai
+tmpl: #Context;                                      // 1. CAPTURE: a plain template var,
+tmpl.allocator         = context.allocator;          //    filled from the LIVE context, on
+tmpl.logger            = context.logger;             //    the source thread, in normal
+tmpl.logger_data       = context.logger_data;        //    context. Copy only the safe
+tmpl.assertion_failed  = context.assertion_failed;   //    ingredient fields.
+tmpl.temporary_storage = context.temporary_storage;  //    (see the nuance below)
+
+// 2. CARRY *tmpl across the boundary: a field on your Thread-like struct, or a C
+//    API's void* user_data (the reason such callback APIs hand you one).
+
+on_event :: (data: *void) #c_call {                  // 3. REBUILD + push on the far side
+    new_ctx := (cast(*#Context) data).*;             //    (#c_call has no implicit context)
+    push_context new_ctx { /* `context` is valid in here */ }
+}
+```
+
+- **`temporary_storage` is the field that needs thought.** A *concurrent* thread must
+  get its OWN arena (two bump allocators on one arena = silent corruption) — `Thread`
+  allocs a fresh buffer. A *synchronous nested* callback (the lib calls you back on your
+  own thread, then returns) BORROWS the caller's — just copy it, as shown.
+- **Refresh, don't snapshot.** Re-run the capture before *every* hand-off (each spawn /
+  each dispatch), not once at init — else callbacks run with a stale logger/allocator,
+  and a callback's `log_error` bypasses a logger installed later (e.g. a test's error
+  recorder), defeating the error-as-signal discipline.
+
+Worked, self-verifying example (both subtleties): `compendium/21_context_handoff.jai`.
+
 ## Language Evolution & Deprecations
 <!-- Source: CHANGELOG.txt beta 0.2.019 through 0.2.028 -->
 
