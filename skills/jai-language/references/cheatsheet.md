@@ -3,7 +3,7 @@
 > **Jai Version**: beta 0.2.029
 > **Platform**: Linux x86-64
 > **All entries verified against**: `~/jai/jai/` distribution (how_to/, modules/, examples/)
-> **Last updated**: 2026-04-30
+> **Last updated**: 2026-06-19
 
 ## Ecosystem Context
 
@@ -1070,6 +1070,46 @@ my_macro2 :: (row: *$T, override_code: Code = #code .[]) #expand {
 #file                                  // current file path (alias for #filepath)
 #filepath                              // current file path
 ```
+
+### Module Parameters: Two Groups + Program-Wide Type Injection
+<!-- verified: beta 0.2.029, from how_to/380_module_parameters/, modules/GetRect/module.jai -->
+
+`#module_parameters (group1)(group2)` declares up to TWO parameter lists with different scoping rules:
+
+```jai
+#module_parameters (MAX := 64, DEBUG := false)(Handler_Data: Type = void);
+//                  ^^^^^^^^^^^^^^^^^^^^^^^^^^  ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+//                  group 1: per-import          group 2: PROGRAM-WIDE (set once)
+```
+
+- **Group 1 — per-import (module) parameters.** Each `#import` may pass different values; each *distinct argument list* compiles a SEPARATE copy of the module (separate procs, separate global storage). Re-importing with an identical list deduplicates to one instance. Dedup matches on the **textual argument list**, so `(A=1,B=2)` and `(B=2,A=1)` do NOT dedup even though equivalent (how_to/380 lines 98–137).
+- **Group 2 — program parameters.** GLOBAL to the whole program: ONE value shared by every import of that module. Rules (how_to/380 lines 179–181):
+  - **Only the MAIN PROGRAM may supply them — never a library/imported module.** A module that tries (e.g. `#import "core"()(Param = X)` inside a library) fails to compile: *"This #import provides program parameters, but is not located in the main program. Program parameters can only be supplied from the main program."* (verified beta 0.2.029). A library imports the core **bare** and inherits whatever the main set.
+  - Supplied **exactly once**, by that main-program import, which **must precede every other import of the same module** (else "too late to set them" → compile error).
+  - Other imports that omit group 2 inherit the single global value.
+- The first `()` is **required** even when empty, to reach group 2: `#import "Basic"()(ENABLE_ASSERT=false);` sets only a program param.
+- Module/program parameters are **NOT exported** to importers (how_to/380 line 31): a consumer can't see `MAX` or `Handler_Data` by name. Inside the module they are ordinary compile-time constants, usable in `#if`.
+
+**Program-wide `Type` parameter = type-safe dependency injection** (the "Type_Indicator" idiom — `modules/GetRect/module.jai:20` uses exactly this; recurs across real projects). There is ONE `Context` type per program, so a `#add_context` field's type cannot vary per-import — therefore the injected type MUST be a group-2 (program) parameter, never group 1:
+
+```jai
+// library/module.jai — core stays generic, never names the consumer's type
+#module_parameters ()(Handler_Data: Type = void);
+#add_context handler_data: *Handler_Data;          // *void by default; *App when injected
+
+#if Handler_Data == void {
+    // generic fallback: callers cast at the boundary (cast(*App) context.handler_data)
+} else {
+    // typed path: context.handler_data is already *App — ZERO casts in handler code
+}
+
+// consumer — sets the program param ONCE, before anything else imports the core:
+#import "library"()(Handler_Data = App);
+```
+
+GetRect bundles several types through one indicator struct — `Type_Indicator.Texture`, `.Font`, `.Window_Type` (module.jai:90–104) — same mechanism, multiple injected types via member access on the indicator.
+
+A layered split (GetRect↔Simp; or an optional router built on a core) is wired by the **main program**, not the library — the library can't set the param. Main imports the core with the layer's type (`#import "core"()(Handler_Data = router.Router)`) while the layer imports the core **bare**. Better still, the library can accept the injected type **structurally** instead of by exact identity: a compile-time `type_info` predicate (or a `$T/R` restriction, see Procedures) testing *"param type is `R`, or a struct embedding `R` via `#as using`"* lets a consumer pass **their own** struct that `#as using`-embeds the indicator (see Structs). They reclaim the single program-wide slot for their own state yet still get the layer's behavior — all cast-free, since `#as` makes `*Their_Struct` implicitly convert to `*R`. (`#if` needs a constant, so wrap the predicate call in `#run`; for an unwired/incompatible type, `#run Compiler.compiler_report("...")` in the `else` arm gives a clean, custom error — no `#assert` boilerplate.)
 
 ## Operators
 <!-- verified: beta 0.2.028 -->
