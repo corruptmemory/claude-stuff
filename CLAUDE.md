@@ -109,11 +109,11 @@ Bind to a ROFI menu entry so it's a one-keypress switch. Adds a manual step on e
 
 **Recommendation:** Start with **Option B** on the laptop while Open Brain is still a young system being iterated on — explicit control accelerates debugging when something breaks. Once the stack is stable and boring, migrate to **Option A** for set-and-forget. The laptop's Claude Code doesn't care which approach you pick; it just reads whatever URL is in `~/.claude.json`.
 
-## Platform: Arch Linux with Brave Browser
+## Platform: Arch Linux with Brave Origin
 
-This machine runs Arch Linux. Chrome is **not installed**. The browser is **Brave** at `/usr/bin/brave`.
+This machine runs Arch Linux. Chrome is **not installed**. The browser is **Brave Origin** at `/usr/bin/brave-origin` (the older Brave at `/usr/bin/brave` was removed in the 2026-06 Brave → Brave Origin migration).
 
-**Playwright MCP setup:** The Playwright plugin must use Brave instead of Chrome. Configure by editing the plugin's `.mcp.json`:
+**Playwright MCP setup:** The Playwright plugin must use Brave Origin instead of Chrome. Configure by editing the plugin's `.mcp.json`:
 
 ```bash
 # Find the plugin config (hash changes on updates):
@@ -125,19 +125,25 @@ find ~/.claude/plugins/cache -path '*/playwright/*/.mcp.json'
 {
   "playwright": {
     "command": "npx",
-    "args": ["@playwright/mcp@latest", "--executable-path", "/usr/bin/brave"]
+    "args": ["@playwright/mcp@latest", "--executable-path", "/usr/bin/brave-origin"]
   }
 }
 ```
 
 **If Playwright fails with "Chromium distribution 'chrome' is not found":**
 1. Find the `.mcp.json` with the command above
-2. Add `"--executable-path", "/usr/bin/brave"` to the args array
+2. Add `"--executable-path", "/usr/bin/brave-origin"` to the args array
 3. Restart Claude Code (the MCP server caches the old config)
 
 **Never** run `npx playwright install` — it tries to install Chrome and fails on Arch. The `--executable-path` flag is discovered via `npx @playwright/mcp@latest --help`.
 
-## chrome-devtools-mcp + WebMCP — install on every Brave machine
+## chrome-devtools-mcp + WebMCP — install on every Brave Origin machine
+
+> ⚠️ Brave → Brave Origin migration (2026-06): the paths below now point at
+> `Brave-Origin`. WebMCP support in the *stripped* Brave Origin build is
+> **UNVERIFIED** — the `chrome://flags#enable-webmcp-testing` toggle may not
+> exist there at all. Confirm the flag is present before relying on this
+> section; if Origin lacks it, run a separate full Chromium/Brave for WebMCP work.
 
 Brave 148+ ships the WebMCP browser API (`navigator.modelContext`, `navigator.modelContextTesting`) behind a single `chrome://flags` toggle. To let Claude Code drive a WebMCP-aware page through that Brave, you need three pieces wired together: Brave running with the flag on and `--remote-debugging-port=9222`, the `chrome-devtools-mcp` plugin installed, and the plugin's cached manifest hand-patched to point at your Brave on that port. **The patch matters** — by default the plugin spawns its own Puppeteer-managed Chrome that does NOT have the WebMCP flag, so without step 4 below you get generic devtools against a throwaway browser instead of WebMCP against your actual Brave.
 
@@ -148,7 +154,7 @@ Brave 148+ ships the WebMCP browser API (`navigator.modelContext`, `navigator.mo
 #    In Brave: chrome://flags#enable-webmcp-testing → Enabled → Relaunch.
 #    Verify (Brave can be running):
 jq -r '.browser.enabled_labs_experiments[]' \
-    ~/.config/BraveSoftware/Brave-Browser/Local\ State | grep webmcp
+    ~/.config/BraveSoftware/Brave-Origin/Local\ State | grep webmcp
 # expect: enable-webmcp-testing@1
 
 # 2. Make sure Brave is launched with --remote-debugging-port=9222.
@@ -423,7 +429,7 @@ Claude in Chrome does not work on Brave due to a server-side feature flag (`chro
   "browser": {
     "launchOptions": {
       "channel": "chrome",
-      "executablePath": "/usr/bin/brave",
+      "executablePath": "/usr/bin/brave-origin",
       "headless": false
     }
   }
