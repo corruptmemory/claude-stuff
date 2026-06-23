@@ -139,29 +139,32 @@ find ~/.claude/plugins/cache -path '*/playwright/*/.mcp.json'
 
 ## chrome-devtools-mcp + WebMCP — install on every Brave Origin machine
 
-> ⚠️ Brave → Brave Origin migration (2026-06): the paths below now point at
-> `Brave-Origin`. WebMCP support in the *stripped* Brave Origin build is
-> **UNVERIFIED** — the `chrome://flags#enable-webmcp-testing` toggle may not
-> exist there at all. Confirm the flag is present before relying on this
-> section; if Origin lacks it, run a separate full Chromium/Brave for WebMCP work.
+> ✅ Brave → Brave Origin migration (2026-06): paths below point at `Brave-Origin`.
+> WebMCP IS supported in Brave Origin — **verified on 149.1.91.175** (Chromium
+> 149): both `chrome://flags#enable-webmcp-testing` (the WebMCP API + testing
+> interfaces) and `chrome://flags#devtools-webmcp-support` (the DevTools WebMCP
+> category) are present and Enabled. The *stripped* Origin build keeps WebMCP.
+> Origin is a version AHEAD of the "Brave 148" this section was first written
+> against — version numbers below were bumped to 149 to match.
 
-Brave 148+ ships the WebMCP browser API (`navigator.modelContext`, `navigator.modelContextTesting`) behind a single `chrome://flags` toggle. To let Claude Code drive a WebMCP-aware page through that Brave, you need three pieces wired together: Brave running with the flag on and `--remote-debugging-port=9222`, the `chrome-devtools-mcp` plugin installed, and the plugin's cached manifest hand-patched to point at your Brave on that port. **The patch matters** — by default the plugin spawns its own Puppeteer-managed Chrome that does NOT have the WebMCP flag, so without step 4 below you get generic devtools against a throwaway browser instead of WebMCP against your actual Brave.
+Brave Origin 149+ ships the WebMCP browser API (`navigator.modelContext`, `navigator.modelContextTesting`) behind two `chrome://flags` toggles — `#enable-webmcp-testing` (the API + testing interfaces) and `#devtools-webmcp-support` (the DevTools WebMCP category). To let Claude Code drive a WebMCP-aware page through that Brave, you need three pieces wired together: Brave running with the flag on and `--remote-debugging-port=9222`, the `chrome-devtools-mcp` plugin installed, and the plugin's cached manifest hand-patched to point at your Brave on that port. **The patch matters** — by default the plugin spawns its own Puppeteer-managed Chrome that does NOT have the WebMCP flag, so without step 4 below you get generic devtools against a throwaway browser instead of WebMCP against your actual Brave.
 
 ### Bootstrap order (per machine)
 
 ```bash
-# 1. Enable the chrome://flags toggle (once).
-#    In Brave: chrome://flags#enable-webmcp-testing → Enabled → Relaunch.
-#    Verify (Brave can be running):
+# 1. Enable the chrome://flags toggles (once). Brave Origin 149 exposes BOTH:
+#      chrome://flags#enable-webmcp-testing   → Enabled  (WebMCP API + testing)
+#      chrome://flags#devtools-webmcp-support → Enabled  (DevTools WebMCP category)
+#    Then Relaunch. Verify (Brave can be running):
 jq -r '.browser.enabled_labs_experiments[]' \
     ~/.config/BraveSoftware/Brave-Origin/Local\ State | grep webmcp
-# expect: enable-webmcp-testing@1
+# expect: devtools-webmcp-support@1  and  enable-webmcp-testing@1
 
 # 2. Make sure Brave is launched with --remote-debugging-port=9222.
 #    Typically baked into your launcher .desktop file or window-manager config.
 #    Verify:
 curl -s http://127.0.0.1:9222/json/version | jq -r .Browser
-# expect: Chrome/148.x.x.x (or newer)
+# expect: Chrome/149.x.x.x (or newer)
 
 # 3. Install the plugin (user-scope auto-applied).
 claude plugin install chrome-devtools-mcp
@@ -214,8 +217,8 @@ node -e '
 ### Gotchas
 
 - **The cache patch is fragile.** `claude plugin update chrome-devtools-mcp` will overwrite both `.mcp.json` and `.claude-plugin/plugin.json` from upstream. Re-run step 4 after every plugin update. Long-term fix: either the upstream marketplace pin needs to restore the `--browserUrl` default, or the plugin manifest needs a `userConfig` section so `settings.json -> pluginConfigs.chrome-devtools-mcp@claude-plugins-official.mcpServers.chrome-devtools` can override the args durably. Worth a PR upstream when motivated.
-- **Don't add `--categoryExperimentalWebmcp` to the args on Brave 148.** That flag enables a dedicated WebMCP tool category inside chrome-devtools-mcp but requires Chromium 149+ AND a `DevToolsWebMCPSupport` feature flag that Brave 148 doesn't expose. Add it when Brave updates past 149.
-- **`evaluate_script` is the working path on Brave 148.** Anything you can do via direct CDP JS eval against `navigator.modelContext` / `navigator.modelContextTesting`, the plugin can do via its `evaluate_script` tool. That's sufficient for WebMCP-aware pages today.
+- **`--categoryExperimentalWebmcp` is now UNBLOCKED on Brave Origin 149.** This arg enables a dedicated WebMCP tool category inside chrome-devtools-mcp; it requires Chromium 149+ AND the `DevToolsWebMCPSupport` feature flag — both of which Brave Origin 149.1.91.175 satisfies (`#devtools-webmcp-support` is present and Enabled). The old Brave-148 blocker is gone, so add it to the plugin args (alongside `--browserUrl` in step 4) to get the dedicated category. (Not yet smoke-tested end-to-end here — confirm the category actually surfaces after enabling.)
+- **`evaluate_script` is the reliable path on Brave Origin 149.** Anything you can do via direct CDP JS eval against `navigator.modelContext` / `navigator.modelContextTesting`, the plugin can do via its `evaluate_script` tool — a solid fallback even if `--categoryExperimentalWebmcp` (above) isn't wired up.
 - **Permissions:** Don't forget to add the **chrome-devtools-mcp block** to `.claude/settings.local.json` per project — see the next section.
 
 ## MCP Plugin Permissions (stop the prompting)
