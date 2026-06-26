@@ -3,7 +3,7 @@
 > **Jai Version**: beta 0.2.029
 > **Platform**: Linux x86-64
 > **All entries verified against**: `~/jai/jai/` distribution (how_to/, modules/, examples/)
-> **Last updated**: 2026-06-19
+> **Last updated**: 2026-06-26
 
 ## Ecosystem Context
 
@@ -311,6 +311,16 @@ AlignedData :: struct {
     ctx: CONTEXT #align 32;          // aligned to 32 bytes
     crc: u32 #align 1;              // pack tightly (1-byte alignment)
 }
+// #align is a field-START operator: rounds where a field BEGINS up to power-of-2 N and
+// raises struct alignment to >= N. It does NOT touch layout INSIDE a field's type, so it
+// cannot make array element stride or matrix-column padding — `[4] float #align 16` is
+// 16 bytes, NOT std140's 64. Default struct layout is C-style NATURAL alignment
+// (#no_padding opts out); Math.Vector3 is 12 bytes/align 4 (NOT SIMD-16-aligned), so
+// {Vector3;Vector3;Vector4} is 0/12/24 size 40. For GPU std140/std430 element/column
+// STRIDE you need a layout-correct element TYPE, not #align. GOTCHA: #overlay aliases
+// memory but does NOT propagate the overlaid member's alignment — an overlay over [S]u8
+// has alignment 1; bake it with `#align S` on the storage. Worked, compiled example +
+// the Fatty($S,$T) "give a type a GPU stride" primitive: compendium/23_struct_layout_and_gpu.jai
 
 // Anonymous struct/enum/union as field types
 // Source: modules/Pool.jai
