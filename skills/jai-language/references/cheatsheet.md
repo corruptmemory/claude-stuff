@@ -2,15 +2,31 @@
 
 > **Jai Version**: beta 0.2.030
 > **Platform**: Linux x86-64
-> **All entries verified against**: `~/jai/jai/` distribution (how_to/, modules/, examples/)
+> **Checked against**: `~/jai/jai/` distribution (how_to/, modules/, examples/)
 > **Last updated**: 2026-07-03
+
+### Verification banners (two tiers)
+
+Each section carries an HTML-comment banner stating how strongly its contents are verified,
+and against which compiler version:
+
+- `<!-- compile-verified: beta X | compendium/NN.jai -->` — **strong**: the section's
+  constructs are exercised by that compendium file, which **compiles (and runs) clean** against
+  version X. Trust these for first-pass codegen — they are proven to compile.
+- `<!-- inspection-only: beta X -->` — **weaker**: checked by *reading* the distribution
+  source/`how_to` at version X, not compile-proven. Usually correct, but a stale module
+  signature can hide here. These are the backlog awaiting a compendium proof (see
+  SKILL.md → "verification requirement"). The version may lag the header if not re-checked.
+
+Module quick-refs (File, Basic formatting, …) are the highest-drift entries — their signatures
+change independently of language syntax — so they are prioritized for `compile-verified`.
 
 ## Ecosystem Context
 
 Jai is a general-purpose systems-level language being developed primarily in the context of building a first-class multi-platform game engine. As a result, the standard library is oriented toward game development needs (graphics, audio, math, threading, file I/O) and intentionally omits many "batteries included" features common in languages like Go, Python, or Rust. Notable gaps include: HTTP servers/clients (there is a `Curl` module wrapping libcurl), JSON serialization/deserialization, broad cryptography support, template engines, and package management. There is no package manager by design — external code is vendored directly into the project's `modules/` directory. When building non-game applications (web servers, data pipelines, CLI tools), expect to implement or vendor these capabilities yourself.
 
 ## Declarations
-<!-- verified: beta 0.2.028 -->
+<!-- inspection-only: beta 0.2.028 -->
 
 ```jai
 x := 5;                        // variable, type inferred
@@ -59,7 +75,7 @@ a, d:, c = 4, 5, 6;                                 // d: declares new; a,c assi
 ```
 
 ## Procedures
-<!-- verified: beta 0.2.028 -->
+<!-- inspection-only: beta 0.2.028 -->
 
 ```jai
 // Basic
@@ -153,7 +169,7 @@ result := no_inline expensive();
 ```
 
 ## Operator Overloading
-<!-- verified: beta 0.2.028 -->
+<!-- inspection-only: beta 0.2.028 -->
 
 ```jai
 operator + :: (a: Vec2, b: Vec2) -> Vec2 { }
@@ -173,7 +189,7 @@ operator- :: Basic.operator-;          // import operator from another module
 ```
 
 ## Types
-<!-- verified: beta 0.2.028 -->
+<!-- inspection-only: beta 0.2.028 -->
 
 ### Primitives
 - `int` (s64), `u8` `u16` `u32` `u64`, `s8` `s16` `s32` `s64`
@@ -225,7 +241,7 @@ initializer_of(Type)           // default initializer procedure
 ```
 
 ### Number Literals
-<!-- verified: beta 0.2.028 -->
+<!-- inspection-only: beta 0.2.028 -->
 ```jai
 42                             // decimal integer
 0xff                           // hexadecimal (0x prefix)
@@ -244,7 +260,7 @@ initializer_of(Type)           // default initializer procedure
 ```
 
 ## Structs
-<!-- verified: beta 0.2.028 -->
+<!-- inspection-only: beta 0.2.028 -->
 
 ```jai
 Vector3 :: struct {
@@ -386,7 +402,7 @@ Extended :: struct {
 ```
 
 ## Struct/Array Literals
-<!-- verified: beta 0.2.028 -->
+<!-- inspection-only: beta 0.2.028 -->
 
 ```jai
 Type.{field = value, field2 = value2}    // named fields
@@ -411,7 +427,7 @@ a = .[{3, "Yes"}, {2, "No"}]            // non-dot struct literals inside array 
 ```
 
 ## Enums
-<!-- verified: beta 0.2.028 -->
+<!-- inspection-only: beta 0.2.028 -->
 
 ```jai
 Direction :: enum { NORTH; SOUTH; EAST; WEST; }
@@ -425,7 +441,7 @@ using enum u16 { NONE; SOME :: 5; ALL; }
 ```
 
 ## Unions
-<!-- verified: beta 0.2.028 -->
+<!-- inspection-only: beta 0.2.028 -->
 
 ```jai
 // Basic (UNTAGGED) union
@@ -491,7 +507,7 @@ buffer: SymbolBuffer(MAX_NAME_LEN);  // instantiation with parameter
 ```
 
 ## Control Flow
-<!-- verified: beta 0.2.028 -->
+<!-- inspection-only: beta 0.2.028 -->
 
 ### If Statement
 ```jai
@@ -605,7 +621,7 @@ my_macro :: () #expand {
 ```
 
 ### Loop-Body Directives
-<!-- verified: beta 0.2.028 -->
+<!-- inspection-only: beta 0.2.028 -->
 ```jai
 // #no_abc and #no_aoc can appear BETWEEN iterable and body in for loops
 // Source: modules/Hash.jai
@@ -617,7 +633,7 @@ for 0..size-1 #no_abc #no_aoc {        // no array bounds check, no auto output 
 ```
 
 ### Standalone #no_aoc / #no_abc Block Statements
-<!-- verified: beta 0.2.028 -->
+<!-- inspection-only: beta 0.2.028 -->
 ```jai
 // #no_aoc can wrap an arbitrary block of statements (NOT just for-loops)
 // This disables arithmetic overflow checking for the enclosed operations
@@ -659,7 +675,7 @@ result := #ifx cond then a else b;     // compile-time ifx
 ```
 
 ## Directives
-<!-- verified: beta 0.2.028 -->
+<!-- inspection-only: beta 0.2.028 -->
 
 ### Imports
 ```jai
@@ -796,7 +812,7 @@ DELIM
 ```
 
 ### Type Variants (`#type,distinct` and `#type,isa`)
-<!-- verified: beta 0.2.028, from how_to/180_type_variants.jai -->
+<!-- inspection-only: beta 0.2.028, from how_to/180_type_variants.jai -->
 ```jai
 // #type,distinct — newtype: same layout, NO implicit cast to/from base type.
 // Use for type safety when you want the same representation but distinct identity.
@@ -887,7 +903,7 @@ assert(type_of(p) == Position3);       // true
 ```
 
 ### External Declarations (`#elsewhere`)
-<!-- verified: beta 0.2.028 -->
+<!-- inspection-only: beta 0.2.028 -->
 ```jai
 // #elsewhere declares variables/procedures whose bodies live in external libraries
 // Source: examples/dll/main.jai, modules/macOS/bindings/core_foundation.jai, modules/macOS/bindings/mach.jai
@@ -934,7 +950,7 @@ NSApp: *NSApplication #elsewhere;                               // from AppKit
 ```
 
 ### Code Literals
-<!-- verified: beta 0.2.028 -->
+<!-- inspection-only: beta 0.2.028 -->
 ```jai
 #code { block; }                        // code literal (type: Code)
 #code expr;                             // expression as code
@@ -959,7 +975,7 @@ f :: ($c: Code) -> u32 {
 ```
 
 ### Compile-Time AST Rewriting (#code + compiler_get_nodes + #insert)
-<!-- verified: beta 0.2.028, from how_to/630_compiler_get_nodes.jai -->
+<!-- inspection-only: beta 0.2.028, from how_to/630_compiler_get_nodes.jai -->
 ```jai
 // Pattern: Walk/modify AST captured with #code, then #insert the result.
 // Requires: #import "Compiler";
@@ -1051,7 +1067,7 @@ my_macro2 :: (row: *$T, override_code: Code = #code .[]) #expand {
 ```
 
 ### Metaprogramming Directives
-<!-- verified: beta 0.2.028 -->
+<!-- inspection-only: beta 0.2.028 -->
 ```jai
 // #poke_name — replace a name in an inserted/injected scope
 // Source: modules/Iprof/instrument.jai
@@ -1110,7 +1126,7 @@ my_macro2 :: (row: *$T, override_code: Code = #code .[]) #expand {
 ```
 
 ### Module Parameters: Two Groups + Program-Wide Type Injection
-<!-- verified: beta 0.2.029, from how_to/380_module_parameters/, modules/GetRect/module.jai -->
+<!-- inspection-only: beta 0.2.029, from how_to/380_module_parameters/, modules/GetRect/module.jai -->
 
 `#module_parameters (group1)(group2)` declares up to TWO parameter lists with different scoping rules:
 
@@ -1151,7 +1167,7 @@ GetRect bundles several types through one indicator struct — `Type_Indicator.T
 A layered split (GetRect↔Simp; or an optional router built on a core) is wired by the **main program**, not the library — the library can't set the param. Main imports the core with the layer's type (`#import "core"()(Handler_Data = router.Router)`) while the layer imports the core **bare**. Better still, the library can accept the injected type **structurally** instead of by exact identity: a compile-time `type_info` predicate (or a `$T/R` restriction, see Procedures) testing *"param type is `R`, or a struct embedding `R` via `#as using`"* lets a consumer pass **their own** struct that `#as using`-embeds the indicator (see Structs). They reclaim the single program-wide slot for their own state yet still get the layer's behavior — all cast-free, since `#as` makes `*Their_Struct` implicitly convert to `*R`. (`#if` needs a constant, so wrap the predicate call in `#run`; for an unwired/incompatible type, `#run Compiler.compiler_report("...")` in the `else` arm gives a clean, custom error — no `#assert` boilerplate.) Worked, self-verifying example: `compendium/22_open_ended_type_params.jai`.
 
 ## Operators
-<!-- verified: beta 0.2.028 -->
+<!-- inspection-only: beta 0.2.028 -->
 
 ### Precedence (high to low)
 
@@ -1176,7 +1192,7 @@ A layered split (GetRect↔Simp; or an optional router built on a core) is wired
 | 1 | `=`, `+=`, `-=`, `*=`, `/=`, `%=`, `&=`, `\|=`, `^=`, `<<=`, `>>=`, `&&=`, `\|\|=` | Assignment |
 
 ### Rotate Operators
-<!-- verified: beta 0.2.028 -->
+<!-- inspection-only: beta 0.2.028 -->
 ```jai
 x <<< n                               // rotate left (same precedence as <<)
 x >>> n                                // rotate right (same precedence as >>)
@@ -1184,7 +1200,7 @@ x >>> n                                // rotate right (same precedence as >>)
 ```
 
 ### Prefix Dereference (`<<`) — DEPRECATED
-<!-- verified: beta 0.2.028 -->
+<!-- inspection-only: beta 0.2.028 -->
 ```jai
 // WARNING: Unary << is DEPRECATED as of beta 0.2.022 and will be REMOVED in a future beta.
 // Use (.*) or postfix .* instead.
@@ -1228,7 +1244,7 @@ xx,force x                            // autocast force (bypasses checks)
 ```
 
 ## Special Syntax
-<!-- verified: beta 0.2.028 -->
+<!-- inspection-only: beta 0.2.028 -->
 
 ```jai
 .ENUM_VALUE                            // unary dot (type-inferred enum)
@@ -1294,7 +1310,7 @@ using,map(prefix_fn) x;              // using with name remapping function
 ```
 
 ## Escape Sequences (in string literals)
-<!-- verified: beta 0.2.028 -->
+<!-- inspection-only: beta 0.2.028 -->
 
 | Escape | Meaning |
 |--------|---------|
@@ -1327,7 +1343,7 @@ s := trim_right(cmd, "\d010\d013\d032");  // \d032 = space (32)
 ```
 
 ## Comments
-<!-- verified: beta 0.2.028 -->
+<!-- inspection-only: beta 0.2.028 -->
 
 ```jai
 // Line comment
@@ -1349,12 +1365,13 @@ fmt := "C://Users//file.txt";
 ```
 
 ## File I/O and String Formatting
-<!-- verified: beta 0.2.028 -->
+<!-- compile-verified: beta 0.2.030 | compendium/24_module_quick_refs.jai -->
 
 ### File Module (`#import "File"`)
 ```jai
 // Reading
 contents, ok := read_entire_file("path/to/file.txt");     // -> string, bool
+//   full sig: read_entire_file(name, zero_terminated := false, log_errors := true)
 
 // Writing — three overloads:
 write_entire_file("out.txt", "string data");               // string -> bool
@@ -1362,17 +1379,21 @@ write_entire_file("out.bin", data_ptr, byte_count);        // *void, int -> bool
 write_entire_file("out.jai", *builder);                    // *String_Builder -> bool (resets builder)
 write_entire_file("out.jai", *builder, do_reset = false);  // keep builder contents after write
 
-// Directories
-make_directory_if_it_does_not_exist("path/to/dir");
+// Directories — RETURNS bool (directory_now_exists), and takes a `recursive` flag
+now_exists := make_directory_if_it_does_not_exist("path/to/dir", recursive = true);
 
+// Deleting: file_delete(name) -> bool ; delete_directory(name) -> bool
 // Source: modules/File/module.jai
 ```
 
 ### File_Utilities Module (`#import "File_Utilities"`)
 ```jai
-// Walk directory tree — callback receives *File_Visit_Info and userdata pointer
-visit_files("dir", recursive = true, *context, (info: *File_Visit_Info, ctx: *My_Ctx) {
-    if ends_with(info.full_name, ".xml") { /* process */ }
+// visit_files(dir, recursive: bool, user_data: $T, proc: (info: *File_Visit_Info, user_data: T)) -> bool
+// `recursive` is a required positional; the proc is a BARE proc (no capture) — accumulate
+// through the user_data pointer. File_Visit_Info has short_name/full_name/is_directory/size/…
+counter: My_Ctx;
+visit_files("dir", true, *counter, (info: *File_Visit_Info, ctx: *My_Ctx) {
+    if ends_with(info.full_name, ".xml")  ctx.count += 1;
 });
 // Source: modules/File_Utilities/module.jai
 ```
@@ -1382,27 +1403,34 @@ visit_files("dir", recursive = true, *context, (info: *File_Visit_Info, ctx: *My
 // String_Builder for building output
 sb: String_Builder;
 sb.allocator = temp;                                       // use temp allocator for transient strings
-print_to_builder(*sb, "% :: struct {\n", type_name);
+append(*sb, "literal chunk");                              // append(builder, string) or (builder, byte)
+print_to_builder(*sb, "% :: struct {\n", type_name);      // -> bool
 result := builder_to_string(*sb,, allocator = temp);       // note: ,, skips do_reset param
 
 // tprint — temp-allocated sprintf
 name := tprint("%_%", prefix, suffix);
 
-// formatInt — integer formatting with base, padding, minimum digits
+// formatInt — integer formatting with base, padding, minimum digits.
 // Source: modules/Basic/Print.jai
-tprint("%", formatInt(255, base = 16));                    // "ff"
+// TWO forms, both valid: the helper FUNCTION (what how_to/ teaches) and a STRUCT LITERAL.
+// The functions carry a (currently COMMENTED, not yet active) #deprecated pointing at the
+// struct form; the value lives in an embedded Formatter, so the struct form spells it `value=`.
+tprint("%", formatInt(255, base = 16));                    // "ff"  (function form)
+tprint("%", FormatInt.{value = 255, base = 16});           // "ff"  (struct-literal form)
 tprint("%", formatInt(42, minimum_digits = 5));            // "00042"
 tprint("%", formatInt(1000, digits_per_comma = 3, comma_string = ","));  // "1,000"
-// FormatInt struct: { base := 10; minimum_digits := 1; padding: u8 = '0';
-//                     digits_per_comma: u16 = 0; comma_string := ""; }
+// FormatInt struct: { using #as formatter: Formatter; base := 10; minimum_digits := 1;
+//                     padding: u8 = '0'; digits_per_comma: u16 = 0; comma_string := ""; }
 
-// formatFloat — float formatting
-tprint("%", formatFloat(3.14, trailing_width = 2));        // "3.14"
-// FormatFloat.Mode :: enum { DECIMAL; SCIENTIFIC; SHORTEST; }
+// formatFloat — float formatting (same two forms)
+tprint("%", formatFloat(3.14, trailing_width = 2));        // "3.14"  (function form)
+tprint("%", FormatFloat.{value = 3.14, trailing_width = 2});  // "3.14" (struct-literal form)
+// FormatFloat: { width := -1; trailing_width := -1; zero_removal := .YES;
+//                Mode :: enum { DECIMAL; SCIENTIFIC; SHORTEST; }  mode := .DECIMAL; }
 ```
 
 ## Context System
-<!-- verified: beta 0.2.028 -->
+<!-- inspection-only: beta 0.2.028 -->
 
 Every Jai procedure receives an implicit `context` parameter containing:
 - Allocator (default and temporary)
@@ -1512,7 +1540,7 @@ Worked, self-verifying example (both subtleties): `compendium/21_context_handoff
 | `Hash_Table.table_reset()` | 0.2.029 | Reset count, keep allocated memory | Free memory + reset (like `array_reset`) |
 
 ## Tree-Sitter Grammar Issues (tracked for parser development)
-<!-- verified: beta 0.2.028 -->
+<!-- inspection-only: beta 0.2.028 -->
 
 ### Category A: Action overflow / state explosion (cannot add without fundamental restructuring)
 | Issue | Description | Impact | Actions |
