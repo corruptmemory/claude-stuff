@@ -69,11 +69,24 @@ worklist in `references/coverage-closure-plan-2026-07-03.md`. The only `inspecti
 is **Tree-Sitter Grammar Issues** — parser-development notes, not a claim about compiling Jai, so it
 has no compendium proof by design.
 
-**Documented residual exceptions** (structurally impossible to demonstrate in a self-contained
-compiling file — NOT lazy gaps): `#placeholder` (needs a build-driver metaprogram — proven instead
-by `references/build-variables-recipe.md`); `#cpp_method` / `#cpp_return_type_is_non_pod` (need a C++
-translation unit); `#load` (needs a companion file); `#elsewhere` forms 2–4 (custom link-name / bare
-/ on-procedure — need an external library or DLL). These are noted at their cheatsheet banners.
+**Multi-artifact constructs — proven by a DISTRIBUTION EXAMPLE (the third proof source).** A few
+constructs can't be demonstrated in our single-file corpus (they need a metaprogram / companion /
+external link unit), but the Jai distribution ships multi-artifact examples that DO demonstrate them.
+Citing such an example is a legitimate, lighter proof — provided we CONFIRM it still compiles against
+the current version (verified for beta 0.2.030, in scratch copies so the distribution is untouched):
+- `#placeholder` → `how_to/460_code_browsing_and_generation/` (build via `first.jai`) +
+  `examples/add_build_string_into_specific_scope/` (`build.jai`); recipe in `build-variables-recipe.md`.
+- `#load` → `how_to/040_import_and_load/main.jai`.
+- `#elsewhere` forms 2–4 → `examples/dll/` (`build.jai`, builds a real `.so`).
+
+Do NOT assume a shipped example compiles — `examples/module_info.jai` compiles with a **deprecation
+warning** at 0.2.030. So the cited examples are part of the release checklist too: re-compile each on
+every version bump (scratch copies; compile-only is enough — they need no run for signature proof).
+
+**Still unverified here** (no self-contained example ships): `#cpp_method` /
+`#cpp_return_type_is_non_pod` — only used inside platform module bindings (`modules/d3d11`,
+`modules/Windows`, `modules/Check`), which don't build standalone on this box. Genuinely open.
+All of the above are noted at their cheatsheet banners.
 
 **When the audit found errors** (this is the payoff — the proofs are a bug-finder): the beta 0.2.030
 closure corrected three cheatsheet mistakes (`\/` is not a valid escape; `` `break ``/`` `continue ``/

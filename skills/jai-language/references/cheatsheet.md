@@ -680,10 +680,16 @@ result := #ifx cond then a else b;     // compile-time ifx
 
 ## Directives
 <!-- compile-verified: beta 0.2.030 | compendium/07, 28, 29, 31 -->
-<!-- residual (structurally multi-artifact, NOT single-file demonstrable): #placeholder needs a
-     build-driver metaprogram — proven by references/build-variables-recipe.md; #cpp_method /
-     #cpp_return_type_is_non_pod need a C++ TU; #load needs a companion file. All other listed
-     directives are compile-proven in the linked files. -->
+<!-- residual (multi-artifact, so not in our single-file corpus, but DEMONSTRATED by a
+     distribution example CONFIRMED to compile clean against beta 0.2.030):
+       #placeholder → how_to/460_code_browsing_and_generation/ (build via first.jai)
+                      + examples/add_build_string_into_specific_scope/ (build.jai);
+                      recipe: references/build-variables-recipe.md
+       #load        → how_to/040_import_and_load/main.jai
+     STILL unverified here (no self-contained example ships): #cpp_method /
+     #cpp_return_type_is_non_pod — only used inside platform module bindings (modules/d3d11,
+     modules/Windows, modules/Check). All other listed directives are compile-proven in the
+     linked compendium files. -->
 
 ### Imports
 ```jai
@@ -912,6 +918,10 @@ assert(type_of(p) == Position3);       // true
 
 ### External Declarations (`#elsewhere`)
 <!-- compile-verified: beta 0.2.030 | compendium/18 -->
+<!-- compendium/18 proves form 1 (a system-libc global) self-contained. Forms 2-4 (custom
+     link-name / bare / on-procedure) need a real external link unit — DEMONSTRATED by the
+     distribution example examples/dll/ (build via build.jai), confirmed to compile clean at
+     beta 0.2.030. -->
 ```jai
 // #elsewhere declares variables/procedures whose bodies live in external libraries
 // Source: examples/dll/main.jai, modules/macOS/bindings/core_foundation.jai, modules/macOS/bindings/mach.jai
