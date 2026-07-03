@@ -1,5 +1,5 @@
 // Compendium: Context handoff across thread / non-Jai boundaries
-// Jai Version: beta 0.2.029
+// Jai Version: beta 0.2.030
 // Platform: Linux x86-64
 // Sources: modules/Thread/primitives.jai (starting_context), how_to/011_context.jai
 // Use-cases: hand-rolling a context across a boundary where Jai's implicit

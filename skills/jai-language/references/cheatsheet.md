@@ -1,9 +1,9 @@
 # Jai Language Cheat Sheet
 
-> **Jai Version**: beta 0.2.029
+> **Jai Version**: beta 0.2.030
 > **Platform**: Linux x86-64
 > **All entries verified against**: `~/jai/jai/` distribution (how_to/, modules/, examples/)
-> **Last updated**: 2026-06-26
+> **Last updated**: 2026-07-03
 
 ## Ecosystem Context
 
@@ -117,6 +117,12 @@ name :: () #no_alias { }                          // no pointer aliasing
 name :: () #intrinsic;                            // compiler intrinsic (no linkname)
 name :: () #intrinsic "llvm.debugtrap";           // compiler intrinsic with LLVM linkname
 // Source: modules/Runtime_Support.jai:474, modules/Preload.jai:369-373
+// Atomic intrinsics (Preload, always available; ≤ 8-byte types):
+//   atomic_exchange(pointer: *$T, new: T) -> old_value: T   // NEW in 0.2.030 (ARM64 support)
+//   atomic_load(pointer: *$T) -> T                          // NEW in 0.2.030
+//   atomic_store(pointer: *$T, new: T)                      // NEW in 0.2.030
+//   (aliases atomic_swap/atomic_read/atomic_write in modules/Atomics; compare_and_swap is pre-existing)
+// Source: modules/Preload.jai:376-378, modules/Atomics.jai
 name :: () #dump { }                              // dump generated code (debugging)
 
 // #modify block (returns true to accept, false+"msg" to reject)
@@ -205,6 +211,15 @@ $T/interface I                 // interface-restricted polymorphic
 type_of(expr)                  // get type of expression
 size_of(Type)                  // byte size
 type_info(Type)                // runtime type info struct
+// Type_Info_Struct.alignment (s32) — overall struct alignment. NEW in 0.2.030: was on
+//   Code_Struct ("didn't make much sense"); a copy stays there for compat but is likely to
+//   be deprecated — prefer Type_Info_Struct. GOTCHA (verified 0.2.030): only "1 or higher
+//   for any instance ... filled out by the compiler" — it reads -1 (unfilled) for
+//   imported-module types (Math.Vector3/4), polymorphic instantiations (e.g. Fatty(16,float)),
+//   and UNPREDICTABLY for others — the SAME struct definition reads a real value in one file
+//   and -1 in another (context-dependent on surrounding decls; compile-time & runtime agree).
+//   Print it, don't depend on it, in 0.2.030. (Source: modules/Preload.jai:159; empirical:
+//   compendium/23_struct_layout_and_gpu.jai)
 is_constant(expr)              // compile-time check
 initializer_of(Type)           // default initializer procedure
 ```
@@ -413,11 +428,16 @@ using enum u16 { NONE; SOME :: 5; ALL; }
 <!-- verified: beta 0.2.028 -->
 
 ```jai
-// Basic union
+// Basic (UNTAGGED) union
 Value :: union {
     as_int: int;
     as_float: float64;
 }
+// DEPRECATION SIGNAL (0.2.030): UNTAGGED unions — this plain form and the anonymous/bare
+// unions below, used for C-style memory overlap — are "in anticipation of being deprecated."
+// Bindings_Generator now emits `#overlay` instead. Prefer `#overlay` (see Structs) for new
+// field-aliasing code. Still valid & compiling in 0.2.030 (signal, not yet removed). The
+// TAGGED unions below (`union tag: T {}`) are a distinct feature and are NOT affected.
 
 // Tagged union (NEW in beta 0.2.023)
 // Source: CHANGELOG.txt beta 0.2.023, beta 0.2.025
@@ -698,6 +718,14 @@ Source: `modules/Thread/module.jai`
 #run,stallable -> Type { ... }         // stallable with return type
 // Source: examples/VR/modules/Vulkan_Paths.jai, modules/Default_Metaprogram.jai
 // a, b := #run -> Type1, Type2 { ... }  // multi-return form
+// #run,host — run on the HOST during cross-compilation (documented in 0.2.030, how_to/950):
+#run,host expr;                         // e.g. #run,host sprint("built on %/%", OS, CPU)
+#run,host -> string { #import "Basic"; return sprint("built on %/%", OS, CPU); }
+//   Isolated from the target workspace: it sees the HOST's OS/CPU and CANNOT see target
+//   identifiers/types, so re-#import any modules INSIDE the body. Returns only primitives
+//   or arrays of them; takes NO arguments. In a non-cross-compiling build it behaves like
+//   a plain #run. To call your program's own procs at compile-time, use plain #run instead.
+// Source: how_to/950_cross-compiling/do_things_at_compile_time_for_real.jai
 #if cond { ... } else { ... }          // static conditional
 #if cond  stmt;                         // static if with bare body
 #if cond  #load "a.jai"; else  #load "b.jai";  // braceless static if/else
@@ -1096,6 +1124,7 @@ my_macro2 :: (row: *$T, override_code: Code = #code .[]) #expand {
 - **Group 2 — program parameters.** GLOBAL to the whole program: ONE value shared by every import of that module. Rules (how_to/380 lines 179–181):
   - **Only the MAIN PROGRAM may supply them — never a library/imported module.** A module that tries (e.g. `#import "core"()(Param = X)` inside a library) fails to compile: *"This #import provides program parameters, but is not located in the main program. Program parameters can only be supplied from the main program."* (verified beta 0.2.029). A library imports the core **bare** and inherits whatever the main set.
   - Supplied **exactly once**, by that main-program import, which **must precede every other import of the same module** (else "too late to set them" → compile error).
+  - **(0.2.030)** This precedence rule is now enforced across `#if` too: supplying program params in an `#import` inside an `#if` that is *evaluated after* another (paramless) import of the same module used to be **silently ignored** — it is now a **compile error**.
   - Other imports that omit group 2 inherit the single global value.
 - The first `()` is **required** even when empty, to reach group 2: `#import "Basic"()(ENABLE_ASSERT=false);` sets only a program param.
 - Module/program parameters are **NOT exported** to importers (how_to/380 line 31): a consumer can't see `MAX` or `Handler_Data` by name. Inside the module they are ordinary compile-time constants, usable in `#if`.
@@ -1425,7 +1454,7 @@ on_event :: (data: *void) #c_call {                  // 3. REBUILD + push on the
 Worked, self-verifying example (both subtleties): `compendium/21_context_handoff.jai`.
 
 ## Language Evolution & Deprecations
-<!-- Source: CHANGELOG.txt beta 0.2.019 through 0.2.028 -->
+<!-- Source: CHANGELOG.txt beta 0.2.019 through 0.2.030 -->
 
 ### Removed Features
 | Feature | Removed In | Replacement |
@@ -1452,10 +1481,14 @@ Worked, self-verifying example (both subtleties): `compendium/21_context_handoff
 | `#foreign_system_library` | ~0.2.015 | Removed 0.2.025 | `#library,system` |
 | `modules/File_Async` | 0.2.025 | Removed 0.2.026 | Copy from older beta if needed |
 | `Hash_Table.init()` | 0.2.029 | Future | Not needed; use `table_resize()` for explicit sizing |
+| Untagged (plain/anonymous/bare) `union {}` | 0.2.030 (signal) | Future | `#overlay` for memory aliasing; Bindings_Generator already switched. Tagged unions unaffected |
 
 ### New Features (by version)
 | Feature | Added In | Notes |
 |---------|----------|-------|
+| `Type_Info_Struct.alignment` field | 0.2.030 | Overall struct alignment; moved off `Code_Struct` (copy kept for compat, likely to be deprecated). CAVEAT: only *partially* populated in 0.2.030 — reads `-1` (unfilled) unpredictably (imported-module types, polymorphic instantiations, context-dependent). Print it, don't depend on it |
+| `atomic_exchange`/`atomic_load`/`atomic_store` intrinsics | 0.2.030 | Preload, ≤ 8-byte types, added for ARM64; aliases `atomic_swap`/`read`/`write` in `modules/Atomics` |
+| `#run,host` directive (documented) | 0.2.030 | Runs on HOST during cross-compile; isolated from target, re-`#import` inside, primitives-only return, no args; plain `#run` when not cross-compiling (how_to/950) |
 | `void` as zero `Type` value | 0.2.029 | Uninitialized `Type` holds `void`; `void` is `false` in if; index 0 in type tables |
 | Struct literals assign to tagged unions | 0.2.029 | `t = .{ .TAG, field = val };` |
 | `Hash_Table.table_reset_keeping_memory()` | 0.2.029 | Old `table_reset()` behavior (clear count, keep memory) |

@@ -1,5 +1,5 @@
 // Compendium: Hash_Table module
-// Jai Version: beta 0.2.029
+// Jai Version: beta 0.2.030
 // Platform: Linux x86-64
 // Sources: modules/Hash_Table.jai, examples/hash_table_test.jai
 // Use-cases: basic CRUD, iteration, reset/resize, custom hash/compare,

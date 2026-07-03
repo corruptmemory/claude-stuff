@@ -1,8 +1,9 @@
 // Compendium: Struct memory layout & GPU std140/std430 padding
-// Jai Version: beta 0.2.029
+// Jai Version: beta 0.2.030
 // Platform: Linux x86-64
 // Sources: how_to/ (struct layout), modules/Math (Vector3/Vector4),
-//          modules/Float16.jai (#overlay), modules/Runtime_Support.jai (#align)
+//          modules/Float16.jai (#overlay), modules/Runtime_Support.jai (#align),
+//          modules/Preload.jai:159 (Type_Info_Struct.alignment — new in 0.2.030)
 // Use-cases: matching a Jai struct to a GPU buffer layout (push constants, UBO/SSBO
 //            under std140/std430) — and knowing exactly what #align can and cannot do.
 //
@@ -101,5 +102,20 @@ main :: () {
     assert(fat.members[1].offset_in_bytes == 16,
         "Fatty carries 16-byte alignment via `#align S`; arr should land at 16, got %", fat.members[1].offset_in_bytes);
 
-    print("PASS: natural alignment (Vector3=12); #align is field-start-only; #overlay does not propagate alignment; Fatty($S,$T) gives a type a GPU stride+align.\n");
+    // (0.2.030) NEW: Type_Info_Struct.alignment (s32) exposes a struct's overall alignment
+    // (moved off Code_Struct — a copy lingers there for compat). GOTCHA, verified against
+    // beta 0.2.030: it is only "filled out by the compiler" for SOME structs (Preload's own
+    // hedge) and reads -1 (the unfilled sentinel) otherwise — and WHICH structs is
+    // UNPREDICTABLE: it depends on surrounding declarations, so the SAME struct definition
+    // reads a real value in one file and -1 in another (compile-time and runtime agree, but
+    // context does not). Observed -1 for imported-module types (Math.Vector3/4), polymorphic
+    // instantiations (Fatty(16,float)), and Bare_Probe here. So do NOT depend on .alignment
+    // in 0.2.030 — PRINT it, never assert it; the member-offset probes above are the reliable
+    // alignment check. (Re-test each release — this may firm up.)
+    bo := cast(*Type_Info_Struct) type_info(Bare_Overlay);
+    ff := cast(*Type_Info_Struct) type_info(Fat_Float);
+    print("Type_Info_Struct.alignment (0.2.030, partially populated; -1 = unfilled): Bare_Probe=% Bare_Overlay=% Fat_Float=%\n",
+        bare.alignment, bo.alignment, ff.alignment);
+
+    print("PASS: natural alignment (Vector3=12); #align is field-start-only; #overlay does not propagate alignment; Fatty($S,$T) gives a type a GPU stride+align; Type_Info_Struct.alignment (0.2.030) present but only partially populated.\n");
 }

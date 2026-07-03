@@ -8,12 +8,12 @@ description: "Comprehensive Jai programming language reference and cheat sheet. 
 Complete reference for the Jai programming language by Jonathan Blow.
 
 The Jai compiler distribution at `~/jai/jai/` contains the authoritative source:
-- **how_to/** — 80 `.jai` files across subdirectories covering all features
+- **how_to/** — 84 `.jai` files across subdirectories covering all features
 - **examples/** — Real-world programs
 - **modules/** — Standard library
 
 See [references/cheatsheet.md](references/cheatsheet.md) for the full language cheat sheet.
-See [compendium/](compendium/) for compilable code samples demonstrating every language feature (19 files).
+See [compendium/](compendium/) for compilable code samples demonstrating every language feature (23 files).
 See [references/build-variables-recipe.md](references/build-variables-recipe.md) for the canonical
 metaprogram recipe for custom compile-time build variables (`#placeholder` knobs module +
 `Message_Import`-scoped `add_build_string`) — including the beta 0.2.029 gated-`#load` bug the

@@ -1,5 +1,5 @@
 // Compendium: Macros & Metaprogramming
-// Jai Version: beta 0.2.029
+// Jai Version: beta 0.2.030
 // Platform: Linux x86-64
 // Sources: how_to/600_insert.jai, how_to/730_for_expansions.jai
 // Use-cases: #expand, backtick export, #code, #insert, #run,

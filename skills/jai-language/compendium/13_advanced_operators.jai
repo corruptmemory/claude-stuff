@@ -1,5 +1,5 @@
 // Compendium: Advanced Operators & Special Syntax
-// Jai Version: beta 0.2.029
+// Jai Version: beta 0.2.030
 // Platform: Linux x86-64
 // Sources: modules/md5.jai, modules/xxHash/module.jai, modules/Bindings_Generator/restart.jai,
 //          modules/Thread/module.jai, modules/Hash.jai

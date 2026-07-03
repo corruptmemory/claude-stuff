@@ -1,5 +1,5 @@
-// Compendium entry 15: Language Evolution Features (beta 0.2.022-0.2.029)
-// Jai Compiler Version: beta 0.2.029
+// Compendium entry 15: Language Evolution Features (beta 0.2.022-0.2.030)
+// Jai Compiler Version: beta 0.2.030
 // Platform: Linux x86-64
 // Sources: CHANGELOG.txt (0.2.022-0.2.029), examples/dll/main.jai,
 //          modules/Overwriting_Allocator/module.jai,

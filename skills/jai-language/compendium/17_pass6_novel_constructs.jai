@@ -1,5 +1,5 @@
 // Compendium entry 17: Pass 6 Novel Constructs
-// Jai Compiler Version: beta 0.2.029 (9 April 2026)
+// Jai Compiler Version: beta 0.2.030 (2 July 2026)
 // Platform: Linux x86-64
 // Sources: CHANGELOG.txt (0.2.005 "Caststravaganza", 0.2.006 vote result),
 //          modules/Android/examples/camera.jai (function-call cast),

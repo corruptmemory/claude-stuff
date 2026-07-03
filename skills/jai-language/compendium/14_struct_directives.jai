@@ -1,5 +1,5 @@
 // Compendium: Struct Field Directives (#align, #overlay, anonymous types)
-// Jai Version: beta 0.2.029
+// Jai Version: beta 0.2.030
 // Platform: Linux x86-64
 // Sources: modules/Float16.jai, modules/Runtime_Support.jai, modules/Pool.jai,
 //          modules/Android/native_app.jai, modules/File_Async/module.jai

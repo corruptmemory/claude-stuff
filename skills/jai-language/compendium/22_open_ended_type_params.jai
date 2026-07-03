@@ -1,5 +1,5 @@
 // Compendium: Open-ended type parameters — structural acceptance + custom errors
-// Jai Version: beta 0.2.029
+// Jai Version: beta 0.2.030
 // Platform: Linux x86-64
 // Sources: how_to/160_type_restrictions.jai ($T/R + #as using), how_to/170_modify.jai,
 //          modules/Compiler/Compiler.jai (compiler_report, Report),

@@ -1,5 +1,5 @@
 // Compendium: Memory Management
-// Jai Version: beta 0.2.029
+// Jai Version: beta 0.2.030
 // Platform: Linux x86-64
 // Sources: how_to/200_memory_management.jai, how_to/012_temporary_storage.jai
 // Use-cases: New, alloc, free, temporary_storage, push_allocator,
