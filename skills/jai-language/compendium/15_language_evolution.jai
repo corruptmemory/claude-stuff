@@ -10,6 +10,10 @@
 //   - Non-dot struct literals (0.2.022)
 //   - Tagged unions: basic form (0.2.023) and with value bindings (0.2.025)
 //   - Struct literals assigning to tagged unions (0.2.029)
+//   - Parameterized (polymorphic) unions: union(param) { ... } with a
+//     param-sized array member (models modules/Debug/windows.jai SymbolBuffer)
+//   - Metaprogram walk of Type_Info_Struct.tagged_union_bindings
+//     (Type_Info_Tagged_Union_Binding: constant_value + member_index)
 //   - #elsewhere directive for external variable/procedure declarations
 //   - #code,null for null Code values
 //   - #library,no_static_library for dynamic-only libraries
@@ -129,6 +133,87 @@ demo_tagged_union_struct_literal :: () {
 }
 
 // ============================================================================
+// Parameterized (polymorphic) unions: union(param) { ... }
+// ============================================================================
+// A union may take compile-time parameters just like a polymorphic struct,
+// and those parameters can size a member array. The canonical use is the
+// stack-allocated variable-length buffer in modules/Debug/windows.jai:
+//   SymbolBuffer :: union(name_length:u32=0) { symbol: ...; data: [... + name_length] u8; }
+// Instantiate with Name(value); each instantiation is a distinct concrete type
+// whose size is the max over its members (here the param-sized array wins).
+
+Small_Header :: struct {
+    tag:    u32;
+    length: u32;
+}  // size 8, alignment 4
+
+// The array member's length is computed from the union parameter, so the
+// union's size grows with the argument — a real polymorphic-union instantiation.
+Sym_Buffer :: union(name_length: u32 = 0) {
+    header: Small_Header;
+    data:   [size_of(Small_Header) + name_length] u8;
+}
+
+demo_parameterized_union :: () {
+    // Instantiate the polymorphic union with name_length = 16.
+    // Members overlay: size = max(size_of(Small_Header)=8, 8+16=24) = 24.
+    b: Sym_Buffer(16);
+    assert(size_of(type_of(b)) == 24, "Sym_Buffer(16) sizes to its param-sized array member");
+
+    // A different argument yields a DIFFERENT concrete type with a different size.
+    assert(size_of(Sym_Buffer(0))  == 8,  "Sym_Buffer(0) collapses to the header size");
+    assert(size_of(Sym_Buffer(64)) == 72, "Sym_Buffer(64) grows with the parameter");
+
+    // Prove the members truly overlay: write through the struct view, read the
+    // raw bytes (little-endian) through the array view of the SAME storage.
+    b.header.tag    = 0xAABBCCDD;
+    b.header.length = 5;
+    assert(b.data[0] == 0xDD, "byte 0 of the overlaid array is the low byte of tag");
+    assert(b.data[3] == 0xAA, "byte 3 of the overlaid array is the high byte of tag");
+
+    print("parameterized union: size_of(Sym_Buffer(16))=% data[0]=0x% data[3]=0x%\n",
+          size_of(type_of(b)), formatInt(b.data[0], base=16), formatInt(b.data[3], base=16));
+}
+
+// ============================================================================
+// Metaprogram walk of tagged_union_bindings (Type_Info_Tagged_Union_Binding)
+// ============================================================================
+// Source: modules/Preload.jai (Type_Info_Struct.tagged_union_bindings,
+//         Type_Info_Tagged_Union_Binding), modules/Basic/Print.jai (the walk).
+// A tagged union built with the '.TAG ,, field' binding form records, per
+// binding, the tag's integer constant_value and the member_index of the
+// variant field it selects. We walk the bindings of 'Thing' (declared above)
+// and assert the tag->field mapping the compiler recorded.
+
+demo_tagged_union_bindings_walk :: () {
+    info := cast(*Type_Info_Struct) type_info(Thing);
+
+    // The tagged-union textual flag is set for a '.TAG ,, field' union.
+    assert((info.textual_flags & .UNION_IS_TAGGED) != 0, "Thing is a tagged union");
+
+    // Three variants -> three bindings (APPLE/BANANA/ORANGE).
+    assert(info.tagged_union_bindings.count == 3, "Thing has three tagged-union bindings");
+
+    // Resolve each binding to (tag constant, selected member name) and assert
+    // the exact mapping: .APPLE->x, .BANANA->y, .ORANGE->z.
+    apple_field, banana_field, orange_field: string;
+    for binding: info.tagged_union_bindings {
+        member := info.members[binding.member_index];  // member_index indexes Type_Info_Struct.members
+        if binding.constant_value == {
+            case cast(u64) Fruit.APPLE;  apple_field  = member.name;
+            case cast(u64) Fruit.BANANA; banana_field = member.name;
+            case cast(u64) Fruit.ORANGE; orange_field = member.name;
+        }
+    }
+    assert(apple_field  == "x", "binding for .APPLE selects field x");
+    assert(banana_field == "y", "binding for .BANANA selects field y");
+    assert(orange_field == "z", "binding for .ORANGE selects field z");
+
+    print("tagged_union_bindings: count=% mapping APPLE->%, BANANA->%, ORANGE->%\n",
+          info.tagged_union_bindings.count, apple_field, banana_field, orange_field);
+}
+
+// ============================================================================
 // #code,null — null value for Code-typed parameters
 // ============================================================================
 // Source: modules/Compiler/Compiler.jai, examples/codex_view/src/draw_live_allocations.jai
@@ -199,8 +284,14 @@ main :: () {
     demo_tagged_unions();
     print("\n=== Tagged union struct literal assignment (0.2.029) ===\n");
     demo_tagged_union_struct_literal();
+    print("\n=== Parameterized (polymorphic) union ===\n");
+    demo_parameterized_union();
+    print("\n=== Metaprogram walk of tagged_union_bindings ===\n");
+    demo_tagged_union_bindings_walk();
     print("\n=== #code,null ===\n");
     demo_code_null();
     print("\n=== Dereference (new style) ===\n");
     demo_dereference();
+
+    print("\nPASS: non-dot literals, tagged unions (basic + bindings + struct-literal assign), parameterized union sizing/overlay, tagged_union_bindings walk, #code,null, and postfix .* dereference all verified.\n");
 }

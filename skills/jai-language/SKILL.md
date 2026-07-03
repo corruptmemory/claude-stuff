@@ -13,7 +13,8 @@ The Jai compiler distribution at `~/jai/jai/` contains the authoritative source:
 - **modules/** — Standard library
 
 See [references/cheatsheet.md](references/cheatsheet.md) for the full language cheat sheet.
-See [compendium/](compendium/) for compilable code samples demonstrating every language feature (24 files).
+See [compendium/](compendium/) for compilable code samples demonstrating every language feature
+(33 entries: 32 single `.jai` files + the `30_module_parameters/` subdirectory entry).
 See [references/build-variables-recipe.md](references/build-variables-recipe.md) for the canonical
 metaprogram recipe for custom compile-time build variables (`#placeholder` knobs module +
 `Message_Import`-scoped `add_build_string`) — including the beta 0.2.029 gated-`#load` bug the
@@ -32,6 +33,11 @@ Every compendium `.jai` file **must compile without errors or warnings** against
    only *runs* wrong, and a formatInt soft-deprecation only by *reading* the module).
 4. Clean up build artifacts (`rm -rf .build` in the compendium directory; remove the built
    binaries — they are gitignored but should not linger).
+
+**Subdirectory entry:** `30_module_parameters/` is not a single file — compile its driver with an
+import dir:
+`~/jai/jai/bin/jai-linux compendium/30_module_parameters/driver.jai -import_dir compendium/30_module_parameters`.
+(Every other entry is a single `[0-9]*.jai` file compiled directly.)
 
 Do not mark a version as verified until compilation is confirmed. The compendium is a "known good" corpus — if it doesn't compile, the version stamp is a lie.
 
@@ -56,9 +62,22 @@ a large section it only partially covers; that is overclaiming, the same "stamp 
 language syntax (beta 0.2.030 alone changed Thread/NewArray/File), so module quick-refs are the
 highest-value `compile-verified` targets and must be proven by *calling* the real APIs.
 
-**Deferred (the syntax-gap backlog, tracked as of beta 0.2.030):** the remaining
-`inspection-only` sections — Declarations, Procedures, Types, Structs, Enums, Control Flow,
-Operators, Special Syntax, Directives, Context, and the smaller Operator Overloading /
-Struct-Array Literals / Unions / Escape Sequences / Comments — need per-section coverage
-audits linking them to their compendium proof before promotion. Most have a strong candidate
-file already (`compendium/01..23`); the audit is confirming coverage, not writing from scratch.
+**Coverage status (beta 0.2.030, 2026-07-03): the per-section audit + closure is COMPLETE.**
+Every substantive cheatsheet section is now `compile-verified` (27 banners) against a compendium
+entry; the audit that drove this lives in `references/coverage-audit-2026-07-03.md` and the closure
+worklist in `references/coverage-closure-plan-2026-07-03.md`. The only `inspection-only` banner left
+is **Tree-Sitter Grammar Issues** — parser-development notes, not a claim about compiling Jai, so it
+has no compendium proof by design.
+
+**Documented residual exceptions** (structurally impossible to demonstrate in a self-contained
+compiling file — NOT lazy gaps): `#placeholder` (needs a build-driver metaprogram — proven instead
+by `references/build-variables-recipe.md`); `#cpp_method` / `#cpp_return_type_is_non_pod` (need a C++
+translation unit); `#load` (needs a companion file); `#elsewhere` forms 2–4 (custom link-name / bare
+/ on-procedure — need an external library or DLL). These are noted at their cheatsheet banners.
+
+**When the audit found errors** (this is the payoff — the proofs are a bug-finder): the beta 0.2.030
+closure corrected three cheatsheet mistakes (`\/` is not a valid escape; `` `break ``/`` `continue ``/
+`` `remove `` are not backtickable — only `defer`/`return`/`push_context`/operators are; a `,,`
+allocator-override "demo" that didn't use `,,`) and recorded two real 0.2.030 behaviors (compound
+assignment through `[]`/`[]=` calls only the SET overload; `Type_Info_Struct.alignment` is only
+partially populated). Re-run the corpus each release and expect it to keep finding drift.

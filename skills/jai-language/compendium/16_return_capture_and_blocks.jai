@@ -3,7 +3,7 @@
 // Platform: Linux x86-64
 // Sources: modules/Basic/tests.jai (name=,), modules/Subtitles.jai (name:,),
 //          modules/executable_formats/tbd/tbd.jai (multiple name=,),
-//          modules/Basic/Int128.jai (#no_aoc standalone block),
+//          modules/Basic/Int128.jai (#no_aoc standalone block; lines 121, 660 for `} else #no_aoc {`),
 //          modules/Basic/float_to_string.jai (#no_aoc standalone block),
 //          modules/Remap_Context.jai (#Context type),
 //          modules/Android/Toolchain/adb.jai (#Context.default_allocator),
@@ -101,6 +101,34 @@ demo_no_aoc_block :: () {
 }
 
 // ============================================================================
+// } else #no_aoc { } Clause Variant
+// ============================================================================
+// #no_aoc can also tag the else arm of a compile-time #if, exactly as seen
+// in modules/Basic/Int128.jai (lines 121, 660): `#if CPU == .X64 { #asm {...} }
+// else #no_aoc { ... }`. Only the TAKEN arm is compiled, so on this x64 box
+// the #if arm below is inert (kept only to give the #if two arms, mirroring
+// the source shape); the else #no_aoc arm is the one that actually compiles
+// and runs, suppressing the arithmetic-overflow check on its underflowing
+// subtraction.
+
+demo_no_aoc_else_clause :: () {
+    x : u64 = 3;
+    y : u64 = 10;
+    diff: u64;
+
+    #if CPU == .ARM64 {
+        // Not the taken arm on this x64 dev box -- present only so the #if
+        // has two arms, mirroring Int128.jai's #asm / else #no_aoc shape.
+        diff = x - y;
+    } else #no_aoc {
+        diff = x - y;  // Underflows u64; check suppressed by #no_aoc here.
+    }
+
+    print("else #no_aoc result: %\n", diff);
+    assert(diff == 0xFFFF_FFFF_FFFF_FFF9, "expected wrapped underflow result, got %", diff);
+}
+
+// ============================================================================
 // #Context as a Type
 // ============================================================================
 // #Context is the type of the implicit context parameter
@@ -131,6 +159,10 @@ main :: () {
     demo_named_return_capture();
     print("\n=== Standalone #no_aoc Block ===\n");
     demo_no_aoc_block();
+    print("\n=== } else #no_aoc { Clause ===\n");
+    demo_no_aoc_else_clause();
     print("\n=== #Context Type ===\n");
     demo_context_type();
+
+    print("\nPASS: named-return capture (name:, mixed :=/=, _:, discard), standalone #no_aoc { } blocks, the } else #no_aoc { clause variant of a compile-time #if, and #Context as a type/namespace all verified against beta 0.2.030.\n");
 }

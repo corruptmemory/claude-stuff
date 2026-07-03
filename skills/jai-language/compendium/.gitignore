@@ -1,5 +1,7 @@
 # Compiled binaries (no extension, same name as .jai files)
 *
+# Descend into subdir entries (e.g. 30_module_parameters/) so their .jai files track:
+!*/
 !*.jai
 !.gitignore
 

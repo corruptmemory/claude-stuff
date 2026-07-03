@@ -26,7 +26,7 @@ change independently of language syntax — so they are prioritized for `compile
 Jai is a general-purpose systems-level language being developed primarily in the context of building a first-class multi-platform game engine. As a result, the standard library is oriented toward game development needs (graphics, audio, math, threading, file I/O) and intentionally omits many "batteries included" features common in languages like Go, Python, or Rust. Notable gaps include: HTTP servers/clients (there is a `Curl` module wrapping libcurl), JSON serialization/deserialization, broad cryptography support, template engines, and package management. There is no package manager by design — external code is vendored directly into the project's `modules/` directory. When building non-game applications (web servers, data pipelines, CLI tools), expect to implement or vendor these capabilities yourself.
 
 ## Declarations
-<!-- inspection-only: beta 0.2.028 -->
+<!-- compile-verified: beta 0.2.030 | compendium/01 -->
 
 ```jai
 x := 5;                        // variable, type inferred
@@ -75,7 +75,7 @@ a, d:, c = 4, 5, 6;                                 // d: declares new; a,c assi
 ```
 
 ## Procedures
-<!-- inspection-only: beta 0.2.028 -->
+<!-- compile-verified: beta 0.2.030 | compendium/02, 10, 16 -->
 
 ```jai
 // Basic
@@ -169,7 +169,7 @@ result := no_inline expensive();
 ```
 
 ## Operator Overloading
-<!-- inspection-only: beta 0.2.028 -->
+<!-- compile-verified: beta 0.2.030 | compendium/08 -->
 
 ```jai
 operator + :: (a: Vec2, b: Vec2) -> Vec2 { }
@@ -189,7 +189,7 @@ operator- :: Basic.operator-;          // import operator from another module
 ```
 
 ## Types
-<!-- inspection-only: beta 0.2.028 -->
+<!-- compile-verified: beta 0.2.030 | compendium/06, 23 -->
 
 ### Primitives
 - `int` (s64), `u8` `u16` `u32` `u64`, `s8` `s16` `s32` `s64`
@@ -241,7 +241,7 @@ initializer_of(Type)           // default initializer procedure
 ```
 
 ### Number Literals
-<!-- inspection-only: beta 0.2.028 -->
+<!-- compile-verified: beta 0.2.030 | compendium/25 -->
 ```jai
 42                             // decimal integer
 0xff                           // hexadecimal (0x prefix)
@@ -260,7 +260,7 @@ initializer_of(Type)           // default initializer procedure
 ```
 
 ## Structs
-<!-- inspection-only: beta 0.2.028 -->
+<!-- compile-verified: beta 0.2.030 | compendium/04, 14, 23 -->
 
 ```jai
 Vector3 :: struct {
@@ -402,7 +402,7 @@ Extended :: struct {
 ```
 
 ## Struct/Array Literals
-<!-- inspection-only: beta 0.2.028 -->
+<!-- compile-verified: beta 0.2.030 | compendium/32 -->
 
 ```jai
 Type.{field = value, field2 = value2}    // named fields
@@ -427,7 +427,7 @@ a = .[{3, "Yes"}, {2, "No"}]            // non-dot struct literals inside array 
 ```
 
 ## Enums
-<!-- inspection-only: beta 0.2.028 -->
+<!-- compile-verified: beta 0.2.030 | compendium/05 -->
 
 ```jai
 Direction :: enum { NORTH; SOUTH; EAST; WEST; }
@@ -441,7 +441,7 @@ using enum u16 { NONE; SOME :: 5; ALL; }
 ```
 
 ## Unions
-<!-- inspection-only: beta 0.2.028 -->
+<!-- compile-verified: beta 0.2.030 | compendium/15, 19 -->
 
 ```jai
 // Basic (UNTAGGED) union
@@ -507,7 +507,7 @@ buffer: SymbolBuffer(MAX_NAME_LEN);  // instantiation with parameter
 ```
 
 ## Control Flow
-<!-- inspection-only: beta 0.2.028 -->
+<!-- compile-verified: beta 0.2.030 | compendium/03, 16 -->
 
 ### If Statement
 ```jai
@@ -614,14 +614,18 @@ remove;                                 // bare remove — removes current itera
 my_macro :: () #expand {
     `x := 1;                           // export x to caller scope
     `defer free(ptr);                   // defer in caller scope
-    `break;                             // break caller's loop
-    `continue;                          // continue caller's loop
-    `remove it;                         // remove in caller's loop
+    `return;                            // return from caller (also backtickable)
 }
+// ONLY these keywords may be backticked: `defer`, `return`, `push_context`, and
+// overloaded operator functions. `break / `continue / `remove are NOT valid — the
+// compiler errors "Expected an identifier after '`', but 'break' is a keyword."
+// (verified beta 0.2.030; compendium/09_special_syntax.jai). To break/continue/remove
+// in the CALLER's loop from a for-expansion, use #insert keyword remapping instead:
+//   #insert(break=break, continue=continue, remove=remove) body;  // see compendium/12_macros.jai
 ```
 
 ### Loop-Body Directives
-<!-- inspection-only: beta 0.2.028 -->
+<!-- compile-verified: beta 0.2.030 | compendium/13 -->
 ```jai
 // #no_abc and #no_aoc can appear BETWEEN iterable and body in for loops
 // Source: modules/Hash.jai
@@ -633,7 +637,7 @@ for 0..size-1 #no_abc #no_aoc {        // no array bounds check, no auto output 
 ```
 
 ### Standalone #no_aoc / #no_abc Block Statements
-<!-- inspection-only: beta 0.2.028 -->
+<!-- compile-verified: beta 0.2.030 | compendium/16 -->
 ```jai
 // #no_aoc can wrap an arbitrary block of statements (NOT just for-loops)
 // This disables arithmetic overflow checking for the enclosed operations
@@ -675,7 +679,11 @@ result := #ifx cond then a else b;     // compile-time ifx
 ```
 
 ## Directives
-<!-- inspection-only: beta 0.2.028 -->
+<!-- compile-verified: beta 0.2.030 | compendium/07, 28, 29, 31 -->
+<!-- residual (structurally multi-artifact, NOT single-file demonstrable): #placeholder needs a
+     build-driver metaprogram — proven by references/build-variables-recipe.md; #cpp_method /
+     #cpp_return_type_is_non_pod need a C++ TU; #load needs a companion file. All other listed
+     directives are compile-proven in the linked files. -->
 
 ### Imports
 ```jai
@@ -812,7 +820,7 @@ DELIM
 ```
 
 ### Type Variants (`#type,distinct` and `#type,isa`)
-<!-- inspection-only: beta 0.2.028, from how_to/180_type_variants.jai -->
+<!-- compile-verified: beta 0.2.030 | compendium/06 -->
 ```jai
 // #type,distinct — newtype: same layout, NO implicit cast to/from base type.
 // Use for type safety when you want the same representation but distinct identity.
@@ -903,7 +911,7 @@ assert(type_of(p) == Position3);       // true
 ```
 
 ### External Declarations (`#elsewhere`)
-<!-- inspection-only: beta 0.2.028 -->
+<!-- compile-verified: beta 0.2.030 | compendium/18 -->
 ```jai
 // #elsewhere declares variables/procedures whose bodies live in external libraries
 // Source: examples/dll/main.jai, modules/macOS/bindings/core_foundation.jai, modules/macOS/bindings/mach.jai
@@ -950,7 +958,7 @@ NSApp: *NSApplication #elsewhere;                               // from AppKit
 ```
 
 ### Code Literals
-<!-- inspection-only: beta 0.2.028 -->
+<!-- compile-verified: beta 0.2.030 | compendium/12, 29 -->
 ```jai
 #code { block; }                        // code literal (type: Code)
 #code expr;                             // expression as code
@@ -975,7 +983,7 @@ f :: ($c: Code) -> u32 {
 ```
 
 ### Compile-Time AST Rewriting (#code + compiler_get_nodes + #insert)
-<!-- inspection-only: beta 0.2.028, from how_to/630_compiler_get_nodes.jai -->
+<!-- compile-verified: beta 0.2.030 | compendium/29 -->
 ```jai
 // Pattern: Walk/modify AST captured with #code, then #insert the result.
 // Requires: #import "Compiler";
@@ -1009,7 +1017,8 @@ my_macro :: (c: Code) #expand {
 // #insert,scope() behave this way for strings. To reference caller-defined names
 // (types, functions), use backtick-prefixed identifiers (`Name) in the generated
 // string. Backtick identifiers resolve in the caller's scope, same mechanism as
-// `it, `it_index, `break in for-expansion macros.
+// `it, `it_index in for-expansion macros (backtick IDENTIFIERS; keywords like
+// break/continue can NOT be backticked — only defer/return/push_context/operators).
 //
 // Module-defined names (exported types, internal functions) don't need backticks.
 //
@@ -1067,7 +1076,7 @@ my_macro2 :: (row: *$T, override_code: Code = #code .[]) #expand {
 ```
 
 ### Metaprogramming Directives
-<!-- inspection-only: beta 0.2.028 -->
+<!-- compile-verified: beta 0.2.030 | compendium/33 -->
 ```jai
 // #poke_name — replace a name in an inserted/injected scope
 // Source: modules/Iprof/instrument.jai
@@ -1126,7 +1135,7 @@ my_macro2 :: (row: *$T, override_code: Code = #code .[]) #expand {
 ```
 
 ### Module Parameters: Two Groups + Program-Wide Type Injection
-<!-- inspection-only: beta 0.2.029, from how_to/380_module_parameters/, modules/GetRect/module.jai -->
+<!-- compile-verified: beta 0.2.030 | compendium/30_module_parameters/ -->
 
 `#module_parameters (group1)(group2)` declares up to TWO parameter lists with different scoping rules:
 
@@ -1167,7 +1176,7 @@ GetRect bundles several types through one indicator struct — `Type_Indicator.T
 A layered split (GetRect↔Simp; or an optional router built on a core) is wired by the **main program**, not the library — the library can't set the param. Main imports the core with the layer's type (`#import "core"()(Handler_Data = router.Router)`) while the layer imports the core **bare**. Better still, the library can accept the injected type **structurally** instead of by exact identity: a compile-time `type_info` predicate (or a `$T/R` restriction, see Procedures) testing *"param type is `R`, or a struct embedding `R` via `#as using`"* lets a consumer pass **their own** struct that `#as using`-embeds the indicator (see Structs). They reclaim the single program-wide slot for their own state yet still get the layer's behavior — all cast-free, since `#as` makes `*Their_Struct` implicitly convert to `*R`. (`#if` needs a constant, so wrap the predicate call in `#run`; for an unwired/incompatible type, `#run Compiler.compiler_report("...")` in the `else` arm gives a clean, custom error — no `#assert` boilerplate.) Worked, self-verifying example: `compendium/22_open_ended_type_params.jai`.
 
 ## Operators
-<!-- inspection-only: beta 0.2.028 -->
+<!-- compile-verified: beta 0.2.030 | compendium/08 -->
 
 ### Precedence (high to low)
 
@@ -1192,7 +1201,7 @@ A layered split (GetRect↔Simp; or an optional router built on a core) is wired
 | 1 | `=`, `+=`, `-=`, `*=`, `/=`, `%=`, `&=`, `\|=`, `^=`, `<<=`, `>>=`, `&&=`, `\|\|=` | Assignment |
 
 ### Rotate Operators
-<!-- inspection-only: beta 0.2.028 -->
+<!-- compile-verified: beta 0.2.030 | compendium/13 -->
 ```jai
 x <<< n                               // rotate left (same precedence as <<)
 x >>> n                                // rotate right (same precedence as >>)
@@ -1200,7 +1209,7 @@ x >>> n                                // rotate right (same precedence as >>)
 ```
 
 ### Prefix Dereference (`<<`) — DEPRECATED
-<!-- inspection-only: beta 0.2.028 -->
+<!-- compile-verified: beta 0.2.030 | compendium/08, 13 -->
 ```jai
 // WARNING: Unary << is DEPRECATED as of beta 0.2.022 and will be REMOVED in a future beta.
 // Use (.*) or postfix .* instead.
@@ -1244,16 +1253,17 @@ xx,force x                            // autocast force (bypasses checks)
 ```
 
 ## Special Syntax
-<!-- inspection-only: beta 0.2.028 -->
+<!-- compile-verified: beta 0.2.030 | compendium/09 -->
 
 ```jai
 .ENUM_VALUE                            // unary dot (type-inferred enum)
 ..array                                // spread (unpack into varargs, types must match)
 func(args,, allocator = temp)          // comma-comma (context override)
 ptr := New(MyStruct,, temp);           // allocate from temporary storage via ,,
-`name                                  // backtick (keyword as identifier)
+`name                                  // backtick identifier (resolve/export in caller scope)
 `return false, .{};                    // backtick return (return from caller in #expand macro)
-`break;                                // backtick break (break caller's loop)
+// ONLY `defer / `return / `push_context / operators are backtickable — `break / `continue /
+// `remove are NOT (verified 0.2.030). For caller-loop control use #insert(break=break) etc.
 left\_margin := 0.014;                 // backslash in identifiers (visual break, ignored by compiler)
 // Source: examples/codex_view/src/draw_live_allocations.jai, modules/Basic/Apollo_Time.jai
 // Backslash (`\`) inside identifiers is a "visual break" — the compiler strips it
@@ -1310,7 +1320,7 @@ using,map(prefix_fn) x;              // using with name remapping function
 ```
 
 ## Escape Sequences (in string literals)
-<!-- inspection-only: beta 0.2.028 -->
+<!-- compile-verified: beta 0.2.030 | compendium/26 -->
 
 | Escape | Meaning |
 |--------|---------|
@@ -1321,7 +1331,7 @@ using,map(prefix_fn) x;              // using with name remapping function
 | `\e` | Escape (0x1B) |
 | `\\` | Backslash |
 | `\"` | Double quote |
-| `\/` | Forward slash |
+| `\/` | **NOT a valid Jai escape** — the lexer warns `Unknown escape sequence '\/'` (verified 0.2.030; C allows it, Jai does not). Write a bare `/`. |
 | `\%` | Literal percent (in format strings) |
 | `\xFF` | Hex byte |
 | `\d123` | Decimal byte (0-255). Source: how_to/005_strings.jai:297 |
@@ -1343,7 +1353,7 @@ s := trim_right(cmd, "\d010\d013\d032");  // \d032 = space (32)
 ```
 
 ## Comments
-<!-- inspection-only: beta 0.2.028 -->
+<!-- compile-verified: beta 0.2.030 | compendium/27 -->
 
 ```jai
 // Line comment
@@ -1430,7 +1440,7 @@ tprint("%", FormatFloat.{value = 3.14, trailing_width = 2});  // "3.14" (struct-
 ```
 
 ## Context System
-<!-- inspection-only: beta 0.2.028 -->
+<!-- compile-verified: beta 0.2.030 | compendium/16, 21, 29 -->
 
 Every Jai procedure receives an implicit `context` parameter containing:
 - Allocator (default and temporary)
