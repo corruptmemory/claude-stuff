@@ -509,6 +509,35 @@ These tools are installed on all machines and can be used freely:
 - Keep things simple — no over-abstraction, no unnecessary dependencies
 - Tests should be straightforward table-driven or sequential, using `t.TempDir()` for isolation
 
+## Jai Language Skill — a compile-verified reference (`~/.claude/skills/jai-language/`)
+
+Jai is not in wide use, so model training data on it is sparse and badly out of date. The
+`jai-language` skill exists to be a *reliable enough* reference that first-pass Jai codegen at
+least compiles. It is not a hand-written cheat sheet you trust on faith — it is **proof-backed**.
+Invoke the skill (and read its `SKILL.md`) before writing Jai; the full process lives there. The
+model in brief:
+
+- **The compendium is a "known-good" corpus.** `compendium/` holds ~33 `.jai` entries that each
+  **compile AND run clean** against the pinned Jai version (currently beta 0.2.030). Compiling
+  proves signatures; running proves behavior — do BOTH (the 0.2.030 pass found a type-info field
+  that only *ran* wrong and a soft-deprecation only visible by *reading* the module).
+- **Cheatsheet banners state trust level + version, three tiers:**
+  - `compile-verified: beta X | compendium/NN` — the section's constructs are exercised by that
+    compendium entry (compiles+runs). Trust these for codegen. Linkage is bidirectional: the entry
+    carries a `// Proves (cheatsheet):` header.
+  - `distribution-example-verified` — a construct we can't show single-file (needs a metaprogram /
+    companion / external lib) but a Jai `how_to/`/`examples/` file demonstrates; we CONFIRM that
+    example compiles against the current version (shipped ≠ clean — a distro example was found
+    compiling with a deprecation warning).
+  - `inspection-only: beta X` — read-checked against the distribution, not compiled. The backlog.
+- **On every new Jai release:** bump version stamps, reconcile the CHANGELOG, re-run the whole
+  corpus (compile+run) + re-compile the cited distribution examples + spot-re-audit. The corpus
+  doubles as a **drift-detector** — the 0.2.030 pass caught 3 real cheatsheet errors and 2 compiler
+  behavior changes. This is the "good kind of lazy": one expensive proof pass amortizes across every
+  future version bump.
+- Verify examples in **scratch copies** — never litter or git-touch the `~/jai/jai` distribution
+  (its `.git` is a throwaway for Emacs `project`, no upstream — do not treat it as a real repo).
+
 ## Output discipline — `print` vs `log`/`log_error` (Jai, Odin, native projects)
 
 The choice between `print` and `log`/`log_error` is decided by **suppressibility**, not by file
