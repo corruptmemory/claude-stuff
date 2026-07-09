@@ -109,6 +109,57 @@ func (c *Cache) run(ctx context.Context) {
 
 One function, top-to-bottom readable, state and behavior adjacent.
 
+## The `chan func()` trap — ship data, not behavior
+
+The most common way to get this wrong is a command channel of type
+`chan func()` fed closures that mutate the owned state:
+
+```go
+// WRONG: an executor, not an actor.
+type actor struct { cmds chan func() }
+func (a *actor) run() { for fn := range a.cmds { fn() } }
+func (a *actor) do(fn func()) {                  // ships behavior, blocks for it
+    done := make(chan struct{})
+    a.cmds <- func() { fn(); close(done) }
+    <-done
+}
+func (a *actor) setStatus(k, s string) {
+    a.do(func() { a.tasks[k].Status = s })       // closure captures the receiver + args
+}
+```
+
+This is not an actor — it is `java.util.concurrent.Executor` + `Runnable`: a
+single-thread executor of zero-arg thunks. The closure is a literal GoF
+Command object — its capture list is the command's fields, the captured
+receiver is the command's receiver, calling it is `execute()`. And `do()` is
+a `sync.Mutex` reinvented out of a goroutine, a channel, and a per-call
+handshake; when every call is synchronous (as they usually are) there isn't
+even an async path to justify the machinery.
+
+**The discriminator is what moves.** A command/executor ships *behavior* to
+where the state lives (the closure knows how to mutate). An actor ships
+*data* to where the behavior lives — the behavior stays put in `run()`.
+`chan func()` moves behavior → you built a work queue. A typed command
+channel moves data → you built an actor.
+
+**Litmus:** if the value on the channel could be `fmt.Println` — if its type
+names no operation in your domain — it's an executor, not an actor. `func()`
+is a signature that says *nothing*: nothing typed goes in, nothing comes out.
+
+**Why it drifts here even when you know the rule.** Three forces pull the
+same way in Go: (1) *training mass* — executor / `Runnable` / Command is
+ubiquitous, while actors are thin and scattered across Erlang, Pony, and Akka
+(whose good ergonomics are really Scala's sealed traits + exhaustive `match`,
+not the pattern's); (2) *Go collapses the distinction* — with no sum types,
+no exhaustive matching, and no `receive` primitive, "typed message handled by
+an actor loop" and "command dispatched by a central invoker" become the same
+`switch cmd.op`, so the more-trained-on framing wins by default; (3) a real
+*terseness gradient* — an inline closure is fewer lines than a command struct
+plus a `run()` case. This section is the counter-force: pay the small
+verbosity tax, put a typed message on the wire, keep the behavior in `run()`.
+The idiomatic-Go actor was never the weird part; carrying `Runnable`s instead
+of data was.
+
 ## Lifecycle: `stop` and `wait` are two operations
 
 `stop` and `wait` play the roles a `WaitGroup` splits on purpose — and the
