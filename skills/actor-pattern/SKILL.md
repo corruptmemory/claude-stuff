@@ -142,15 +142,26 @@ func (a *actor) stopAndWait() { a.stop(); a.wait() }
 ```
 
 **`stop` should `recover`, not carry a `sync.Once`.** Stopping is not a drag
-race — let a second or concurrent `close` panic, catch it, make it a no-op.
-Idempotent, zero extra fields:
+race — let a second or concurrent `close` panic and catch it. But do not
+*swallow* the recovered value: a recovered double-stop is a correct no-op and
+*also* evidence that a stray `stop()` caller is loose. Silently discarding it
+is the very silent-failure trap the `recover` was meant to make safe. Check the
+value, log it with an identity so you know *which* actor double-stopped, and
+add `debug.Stack()` when you need to hunt the wayward caller:
 
 ```go
 func (a *actor) stop() {
-    defer func() { recover() }() // re-close panics → swallowed → no-op
-    close(a.cmds)                // or close(a.quit) — see drain vs exit
+    defer func() {
+        if r := recover(); r != nil { // re-close of a closed channel panics
+            log.Printf("actor %s: recovered panic in stop (double stop?): %v", a.id, r)
+            // when hunting the stray caller: log.Printf("%s", debug.Stack())
+        }
+    }()
+    close(a.cmds) // or close(a.quit) — see drain vs exit
 }
 ```
+
+Idempotent, zero extra fields — and a stray stop now surfaces instead of hiding.
 
 ### Drain-then-exit vs exit-at-earliest — there is a season
 
