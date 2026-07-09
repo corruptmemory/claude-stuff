@@ -160,6 +160,21 @@ verbosity tax, put a typed message on the wire, keep the behavior in `run()`.
 The idiomatic-Go actor was never the weird part; carrying `Runnable`s instead
 of data was.
 
+**The one principled exception — an update-fn.** Shipping a function *is* fine
+when its type names a contract: a `func(State) State` update-fn (Clojure's
+`agent`, or `swap!` on an `atom`) takes the current value and returns the next.
+It passes the litmus — `fmt.Println` does not have that signature — because the
+type names a domain operation (state transformation), so the caller ships a
+*typed transform*, not opaque behavior. Two conditions keep it honest: (1)
+**value semantics** — the owner does `s = f(s)` and `f` receives the value, never
+a pointer it mutates in place (the instant it takes `*State`, you are back in the
+trap); (2) it earns its place only when transitions are genuinely open-ended. For
+a small fixed op set, the tagged-command enum still wins — all transitions stay
+visible in `run()`; the update-fn trades that closed, readable set for open
+extensibility. So the full rule is not "never a function on a channel," it is:
+the channel's element type must name a contract — an op enum, or a
+`State → State` transform, never a bare `func()`.
+
 ## Lifecycle: `stop` and `wait` are two operations
 
 `stop` and `wait` play the roles a `WaitGroup` splits on purpose — and the
