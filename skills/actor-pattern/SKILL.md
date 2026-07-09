@@ -53,7 +53,7 @@ Each compendium has 4 examples: basic counter, KV store, polling, actor hierarch
 4. Implement the **actor struct** with a command channel and dispatch thread
 5. Write the **dispatch loop** — single `for/while` loop owning all mutable state as locals
 6. Write **public methods** that send commands and block for results
-7. Wire **shutdown** — signal via a dedicated `quit`/`done` channel (not by closing `cmds`, which races with producers), and keep `stop` (the idempotent trigger) and `wait` (blocks until exit, admits N callers) as **separate** operations. See "Lifecycle" below.
+7. Wire **shutdown** — keep `stop` (a `recover`-guarded, idempotent trigger) and `wait` (blocks until exit; a `WaitGroup`, so N callers) as **separate** operations, and pick drain-then-exit vs exit-at-earliest deliberately. See "Lifecycle" below.
 
 ## Implementation Steps — Actor Hierarchy
 
@@ -111,71 +111,89 @@ One function, top-to-bottom readable, state and behavior adjacent.
 
 ## Lifecycle: `stop` and `wait` are two operations
 
-`stop` and `wait` play the roles a `WaitGroup` splits on purpose:
+`stop` and `wait` play the roles a `WaitGroup` splits on purpose — and the
+mechanism *is* a `WaitGroup`:
 
-- **`stop`** — "wind down and exit as soon as logically possible." A one-way
-  trigger. Nothing about it blocks on the actor actually being gone.
-- **`wait`** — "block until the actor has exited." Like `WaitGroup.Wait()`,
-  **one OR MORE** callers may wait, and each returns only once the actor's
-  goroutine has finished.
+- **`stop`** — "wind down and exit as soon as logically appropriate." A one-way
+  trigger; it does not block on the actor actually being gone.
+- **`wait`** — "block until the actor has exited." `WaitGroup.Wait()` admits
+  **one OR MORE** callers, each returning once the actor's goroutine finishes.
 
-Keep them separate by default. Welding them into a single `stop()` that also
-blocks forecloses every synchronization pattern the split enables: a
-supervisor stopping N sub-actors and *then* waiting on all of them; ordered
-teardown (stop the producer, drain, then stop the consumer); a test asserting
-the actor exited cleanly; any observer that wants to know "it's done" without
-being the one who asked it to stop. Bundling is a decision to throw those away
-— sometimes fine for one app, but make it a deliberate, named choice, not a
-default baked into `stop`.
+Keep them separate by default. Welding them into a single blocking `stop()`
+forecloses the patterns the split buys: a supervisor stopping N sub-actors and
+*then* waiting on all of them; ordered teardown; a test asserting clean exit;
+any observer that wants to know "it's done" without being the one who stopped
+it. Bundling is sometimes fine — but make it a named, deliberate choice
+(`stopAndWait`), not a default baked into `stop`.
 
-Two invariants make the split safe:
-
-- **`stop` must be idempotent and safe from any goroutine.** Guard the signal
-  so a second or concurrent call can't double-close/panic — `sync.Once`, or a
-  recover-guarded close.
-- **`wait` must serve N callers.** A closed channel broadcasts to every
-  receiver, and `WaitGroup.Wait()` admits any number of waiters — both give
-  fan-out for free. Signalling shutdown by *closing a dedicated `quit` channel*
-  (never by closing the command channel, which races with producers and panics
-  on send-after-close) is what makes an idempotent `stop` possible at all.
+**`wait` is a `WaitGroup`.** `Add(1)` before launching, `Done` on the way out,
+and `Wait()` serves N callers for free — no bespoke `done`/`exited` channel:
 
 ```go
 func (a *actor) start() {
+    a.wg.Add(1)
     go func() {
-        defer close(a.exited)          // broadcast "exited" to every waiter
-        for {
-            select {
-            case <-a.quit:             // the stop signal
-                return
-            case fn := <-a.cmds:
-                fn()
-            }
-        }
+        defer a.wg.Done()
+        // ... dispatch loop (see drain vs exit below) ...
     }()
 }
-
-func (a *actor) stop() { a.stopOnce.Do(func() { close(a.quit) }) } // idempotent trigger
-func (a *actor) wait() { <-a.exited }                              // any number of callers
-```
-
-**If you want the common "stop then block" convenience, name it what it does**
-— `stopAndWait()` — so the blocking wait is visible at the call site. Never
-bury a blocking `wait` inside a method named `stop`; a reader wiring `stop()`
-into a shutdown hook has no way to know it blocks.
-
-```go
+func (a *actor) wait()        { a.wg.Wait() }
 func (a *actor) stopAndWait() { a.stop(); a.wait() }
 ```
 
-The Go compendium's `01_basic_actor` already ships this: `Stop()` signals
-(recover-guarded `close`), `Wait()` blocks on a `WaitGroup`. That is the
-reference — prefer it over any bundled `stop()`.
+**`stop` should `recover`, not carry a `sync.Once`.** Stopping is not a drag
+race — let a second or concurrent `close` panic, catch it, make it a no-op.
+Idempotent, zero extra fields:
 
-**Producer discipline (unchanged by the split):** call `stop` only after the
-goroutines that send commands have quiesced. Both a closed `quit` and a closed
-`cmds` leave an in-flight `do()`/send with nowhere to go — the split makes the
-*lifecycle* composable, it does not remove the need for producers to stop
-sending first.
+```go
+func (a *actor) stop() {
+    defer func() { recover() }() // re-close panics → swallowed → no-op
+    close(a.cmds)                // or close(a.quit) — see drain vs exit
+}
+```
+
+### Drain-then-exit vs exit-at-earliest — there is a season
+
+How the dispatch loop *ends* is a real choice, not a detail:
+
+- **Drain then exit** — finish every command already accepted, *then* stop.
+  Close the **command** channel and `range` it:
+  ```go
+  for fn := range a.cmds { fn() }   // stop() closes a.cmds
+  ```
+  Choose this when exiting mid-flight would leave a data store, file, or
+  network protocol in an invalid or costly-to-recover state and you *can*
+  finish cleanly. "The process could be killed or the machine could die
+  anyway" is true — but that is no reason to *emulate* a crash when a tidy
+  shutdown is right there. Cost: closing `cmds` panics a producer that sends
+  after `stop` (often the *desired* loud signal), so producers must quiesce
+  first.
+
+- **Exit at the earliest opportunity** — abandon anything still queued. Use a
+  dedicated `quit` channel and `select`:
+  ```go
+  for {
+      select {
+      case <-a.quit:            // stop() closes a.quit
+          return
+      case fn := <-a.cmds:
+          fn()
+      }
+  }
+  ```
+  Choose this when queued work is discardable and prompt shutdown matters.
+  `cmds` is never closed, so a late producer blocks or is dropped rather than
+  panicking — quieter, but it won't catch a producer that outlived shutdown.
+
+Both variants share the same `wait` (a `WaitGroup`) and the same
+recover-guarded `stop`; only the loop body and which channel `stop` closes
+differ. The Go compendium's `01_basic_actor` is the exit-early form —
+recover-guarded `Stop()` closing a `done` channel, `Wait()` on a `WaitGroup`.
+
+**Name the bundled convenience `stopAndWait()`** so the blocking wait is
+visible at the call site. Never bury a blocking wait inside a method named
+`stop` — a reader wiring `stop()` into a shutdown hook has no way to know it
+blocks.
 
 ## Testing the actor with deterministic time
 
