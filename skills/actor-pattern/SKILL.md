@@ -18,6 +18,45 @@ The only building block is a bounded blocking queue (channel). Languages split i
 
 The actor pattern itself never changes. The only thing that varies is how you spell "send a tagged message and block for the reply." Any language with threads and a mutex can do this.
 
+## Reaching for a Mutex? Actor first
+
+If you find yourself reaching for a Mutex, FIRST consider an actor-based
+solution. Choosing a Mutex should be resisted strongly *most of the time*.
+
+The primary exceptions center around **potential performance costs** — and
+those performance benefits MUST be *significant* to offset the increased
+complexity relative to an actor. In that situation, do not just pick the
+mutex — **propose a spike** comparing the two options (mutex vs actor) along
+at least two axes: **latency** and **throughput**. These are statistical
+problems by nature, so the spike must report `min`, `mean`, `median`,
+`stdev`, and the long-tail percentiles — not single numbers. (A language with
+no channel construct is the other honest exception: there you build the
+channel from first principles per the tier table above, then apply the
+pattern anyway.)
+
+Two observations backing the "most of the time":
+
+- **Non-performance justifications usually dissolve into the pattern's own
+  vocabulary.** The common one: "I need this call to be synchronous" (e.g. so
+  tests are deterministic) — but command-with-ack / block-for-reply IS the
+  actor's synchrony; a mutex buys nothing the reply channel doesn't. Field
+  case (personal-site's RC debouncer, 2026-07): a pipeline stage was built
+  mutex-shaped precisely for synchronous state updates, and every review of it
+  required multi-goroutine interleaving proofs — one real starvation bug hid
+  in those interleavings. Reshaped as an actor (state as `run()` locals, acked
+  offer command), the identical tests passed unchanged off one serial history.
+  If you're writing "deterministic in both interleavings" about your own
+  component, it has one goroutine too many.
+- **Ordering.** All mutex logic centers on *serialized access*, and that
+  serialization has to happen somewhere: with kernel-backed mutexes it shows
+  up as parked threads, and on unlock the wake-up order is a lottery — whoever
+  happens to grab the lock next wins, which reopens the "sensible order of
+  access" question. Channels are FIFO: access to the shared resource is
+  strictly ordered, and the only thing the scheme can't guarantee — fairness
+  among senders when the channel is full — is pushed *upstream* to the channel
+  implementation, out of the actor entirely. The actor simply responds.
+  K.I.S.S. in action.
+
 ## When to Apply
 
 **Single actor:**
