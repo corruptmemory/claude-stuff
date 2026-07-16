@@ -1134,6 +1134,13 @@ my_macro2 :: (row: *$T, override_code: Code = #code .[]) #expand {
 // Standalone #library (no name :: binding) — used for link-only declarations
 #library,system,link_always "libm";   // standalone: just links the library, no identifier
 // Source: modules/stb_vorbis/module.jai, modules/stb_image/module.jai
+// GOTCHA (compile-verified beta 0.2.030): the STANDALONE form is REJECTED at raw toplevel
+// scope ("This kind of expression cannot be used in a toplevel scope"). It parses only
+// inside an #if block (how stb_image uses it) or bound to a name (x :: #library,...;).
+// Named binding + link_always is the portable link-only form.
+// System-lib resolution (observed on the emitted lld line): "libm" → -lm, i.e. it needs
+// the unversioned .so dev symlink; a version-suffixed string ("libgcc_s.so.1") passes
+// through verbatim and resolves WITHOUT a dev symlink (needed on Arch: no /usr/lib/libgcc_s.so).
 // NOTE: #system_library is deprecated in favor of #library,system (CHANGELOG beta 0.2.019)
 // Source: examples/dll/main.jai (#library,no_static_library)
 // Source: modules/Default_Allocator/module.jai (#library,system,no_dll)
