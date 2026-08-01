@@ -228,11 +228,12 @@ The `mcp__*` wildcard in global `settings.json` does NOT actually suppress promp
 **Setup procedure for a new project (`just installed Claude Code here` / `first time in this dir`):**
 
 1. Run `claude mcp list` to see which MCP servers are connected on this machine.
-2. Always include the **Base plugins block** below (playwright + serena + context7).
+2. Always include the **Base plugins block** below (playwright + context7). (Serena was fully uninstalled 2026-08-01 — usage analysis showed 5 calls in two months against a 33-line permissions block per project. Do not re-add its entries.)
 3. **ALWAYS** check for `open-brain` in `claude mcp list`. If present (expected on every machine — see the "Open Brain" section), add the **open-brain block**. If it's *missing*, stop and bootstrap open-brain before continuing — a machine without open-brain is amnesiac relative to the rest of the fleet.
 4. Check for `perplexity` in `claude mcp list`. If present, add the **perplexity block**.
 5. Check for `plugin:chrome-devtools-mcp:chrome-devtools` in `claude mcp list`. If present (expected on every machine with a debug-enabled Brave — see the "chrome-devtools-mcp + WebMCP" section above), add the **chrome-devtools-mcp block**.
-6. If any other MCP server shows up that prompts during use, enumerate its tools the same way and consider whether it's worth adding to this recipe for future projects.
+6. Check for the claude.ai **Google Workspace** connectors — `claude.ai Gmail`, `claude.ai Google Drive`, `claude.ai Google Calendar` — in `claude mcp list`. If present and `✔ Connected`, add the **Google Workspace block**. These are OAuth *cloud connectors managed by claude.ai* (enabled/authed from the `/plugin` → connectors UI or claude.ai), **not** `claude mcp add` and **not** plugins — so their tool names use the `mcp__claude_ai_<Server>__<tool>` shape (a `claude_ai_` prefix, no `plugin_` infix). Verified `✔ Connected` on `godlike-artix` 2026-08-01. Note: the older Anthropic-hosted Google connectors (`gmail.mcp.claude.com`, `gcal.mcp.claude.com`) are deprecated and sit in a local blocked-hosts flag; the *current* ones are Google-hosted (`gmailmcp.googleapis.com`, `calendarmcp.googleapis.com`, `drivemcp.googleapis.com`) and are unaffected by that flag.
+7. If any other MCP server shows up that prompts during use, enumerate its tools the same way and consider whether it's worth adding to this recipe for future projects.
 
 Tool names follow the pattern `mcp__plugin_<pluginname>_<servername>__<toolname>` for plugin-hosted servers, or `mcp__<servername>__<toolname>` for directly-registered servers (like open-brain and perplexity — these were added via `claude mcp add`, not via the plugin system, so they skip the `plugin_` infix).
 
@@ -263,32 +264,6 @@ Tool names follow the pattern `mcp__plugin_<pluginname>_<servername>__<toolname>
 "mcp__plugin_playwright_playwright__browser_select_option",
 "mcp__plugin_playwright_playwright__browser_tabs",
 "mcp__plugin_playwright_playwright__browser_wait_for",
-"mcp__plugin_serena_serena__read_file",
-"mcp__plugin_serena_serena__create_text_file",
-"mcp__plugin_serena_serena__list_dir",
-"mcp__plugin_serena_serena__find_file",
-"mcp__plugin_serena_serena__replace_content",
-"mcp__plugin_serena_serena__get_symbols_overview",
-"mcp__plugin_serena_serena__find_symbol",
-"mcp__plugin_serena_serena__find_referencing_symbols",
-"mcp__plugin_serena_serena__replace_symbol_body",
-"mcp__plugin_serena_serena__insert_after_symbol",
-"mcp__plugin_serena_serena__insert_before_symbol",
-"mcp__plugin_serena_serena__rename_symbol",
-"mcp__plugin_serena_serena__write_memory",
-"mcp__plugin_serena_serena__read_memory",
-"mcp__plugin_serena_serena__list_memories",
-"mcp__plugin_serena_serena__delete_memory",
-"mcp__plugin_serena_serena__edit_memory",
-"mcp__plugin_serena_serena__execute_shell_command",
-"mcp__plugin_serena_serena__search_for_pattern",
-"mcp__plugin_serena_serena__activate_project",
-"mcp__plugin_serena_serena__switch_modes",
-"mcp__plugin_serena_serena__get_current_config",
-"mcp__plugin_serena_serena__check_onboarding_performed",
-"mcp__plugin_serena_serena__onboarding",
-"mcp__plugin_serena_serena__prepare_for_new_conversation",
-"mcp__plugin_serena_serena__initial_instructions",
 "mcp__plugin_context7_context7__resolve-library-id",
 "mcp__plugin_context7_context7__query-docs"
 ```
@@ -348,6 +323,46 @@ Tool names follow the pattern `mcp__plugin_<pluginname>_<servername>__<toolname>
 "mcp__plugin_chrome-devtools-mcp_chrome-devtools__wait_for"
 ```
 
+### Google Workspace block (add when `claude.ai Gmail` / `claude.ai Google Drive` / `claude.ai Google Calendar` are `✔ Connected` in `claude mcp list`)
+
+These are claude.ai OAuth cloud connectors — `mcp__claude_ai_<Server>__<tool>` (a `claude_ai_` prefix, no `plugin_` infix). Gmail deliberately has **no send tool** — only `create_draft`/`update_draft` — so auto-allowing these cannot send mail on your behalf. The write/mutate tools ARE included below (Calendar `create`/`update`/`delete_event`, Drive `create_file`/`copy_file`, Gmail label + draft edits); trim to the read-only subset (`search_*`, `list_*`, `get_*`, `read_file_content`, `download_file_content`) if you'd rather be prompted before any mutation.
+
+```json
+"mcp__claude_ai_Gmail__apply_sensitive_message_label",
+"mcp__claude_ai_Gmail__apply_sensitive_thread_label",
+"mcp__claude_ai_Gmail__create_draft",
+"mcp__claude_ai_Gmail__create_label",
+"mcp__claude_ai_Gmail__delete_label",
+"mcp__claude_ai_Gmail__get_message",
+"mcp__claude_ai_Gmail__get_thread",
+"mcp__claude_ai_Gmail__label_message",
+"mcp__claude_ai_Gmail__label_thread",
+"mcp__claude_ai_Gmail__list_drafts",
+"mcp__claude_ai_Gmail__list_labels",
+"mcp__claude_ai_Gmail__search_threads",
+"mcp__claude_ai_Gmail__unlabel_message",
+"mcp__claude_ai_Gmail__unlabel_thread",
+"mcp__claude_ai_Gmail__update_draft",
+"mcp__claude_ai_Gmail__update_label",
+"mcp__claude_ai_Google_Calendar__create_event",
+"mcp__claude_ai_Google_Calendar__delete_event",
+"mcp__claude_ai_Google_Calendar__get_event",
+"mcp__claude_ai_Google_Calendar__list_calendars",
+"mcp__claude_ai_Google_Calendar__list_events",
+"mcp__claude_ai_Google_Calendar__respond_to_event",
+"mcp__claude_ai_Google_Calendar__search_events",
+"mcp__claude_ai_Google_Calendar__suggest_time",
+"mcp__claude_ai_Google_Calendar__update_event",
+"mcp__claude_ai_Google_Drive__copy_file",
+"mcp__claude_ai_Google_Drive__create_file",
+"mcp__claude_ai_Google_Drive__download_file_content",
+"mcp__claude_ai_Google_Drive__get_file_metadata",
+"mcp__claude_ai_Google_Drive__get_file_permissions",
+"mcp__claude_ai_Google_Drive__list_recent_files",
+"mcp__claude_ai_Google_Drive__read_file_content",
+"mcp__claude_ai_Google_Drive__search_files"
+```
+
 ---
 
 ### Full template — wrap the selected blocks like this:
@@ -365,6 +380,21 @@ Tool names follow the pattern `mcp__plugin_<pluginname>_<servername>__<toolname>
 (JSON doesn't actually allow comments — they're shown above for clarity. Strip them before saving.)
 
 ## glab (GitLab CLI) Quick Reference
+
+> **Always use the `glab` CLI for GitLab — never the GitLab MCP plugin/server.**
+> The official GitLab MCP server (`https://gitlab.com/api/v4/mcp`) is
+> **OAuth-DCR-only**: its required `mcp` token scope is **not creatable as a PAT
+> scope** (gitlab-org/gitlab#554826), so there is no `Authorization: Bearer <PAT>`
+> workaround, and Claude Code's OAuth handshake to GitLab fails (browser consent
+> completes but no token ever persists — most likely GitLab advertising only
+> `plain` PKCE, which strict MCP OAuth clients reject). The
+> `gitlab@claude-plugins-official` plugin was uninstalled and fully purged
+> (plugin cache, `mcpServers`, `enabledPlugins`, `pluginUsage`) on `godlike-artix`
+> **2026-08-01**; **do not reinstall it.** `glab` is already authenticated
+> (`corruptmemory`) and covers MRs, issues, pipelines, and repos. (The
+> `claude-plugins-official` marketplace still *lists* gitlab as installable — that
+> is the catalog, not residue, and it regenerates on marketplace refresh; leave
+> it be.)
 
 `glab` v1.88+ is installed. Key flags that differ from `gh` (GitHub CLI):
 
@@ -506,6 +536,7 @@ These tools are installed on all machines and can be used freely:
 
 - Format Go with `gofmt`
 - **CLI arguments over environment variables** — environment variables are the devil because there's no tooling to ask an arbitrary program "what environment variables do you look at?" Any sane CLI-driven program can tell you what arguments it accepts. Use CLI flags with sensible (or sensibly derived) defaults. It's fine to reach into a shared TOML config for values that are too cumbersome for a CLI invocation, but the config file path itself should be a CLI flag.
+- **Git forges — first-party CLIs, never forge MCP plugins.** Whatever git forge is in play, reach for its **first-party CLI**: `gh` for GitHub, `glab` for GitLab, and whatever the forge itself ships for anything else. This is the default **unless a specific repo says otherwise** — that exception exists in principle (a repo needing some "extra sauce" only an MCP/plugin provides) but in practice is vanishingly rare, so treat "find and use the forge's own CLI" as the standing rule and only deviate on an explicit, per-repo basis. Do **not** install or use forge *MCP plugins*: the GitLab MCP plugin's OAuth handshake is broken with Claude Code (details in the `glab` section above) and the GitKraken plugin is a paid, redundant forge-unifier. Both were uninstalled and fully purged on `godlike-artix` **2026-08-01**; do not reinstall either.
 - Keep things simple — no over-abstraction, no unnecessary dependencies
 - Tests should be straightforward table-driven or sequential, using `t.TempDir()` for isolation
 
