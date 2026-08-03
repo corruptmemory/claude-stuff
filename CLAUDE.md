@@ -540,6 +540,40 @@ These tools are installed on all machines and can be used freely:
 - Keep things simple — no over-abstraction, no unnecessary dependencies
 - Tests should be straightforward table-driven or sequential, using `t.TempDir()` for isolation
 
+## Odin — install from the private `odin-git-local` fork (both machines)
+
+**Odin is installed from a private fork of the AUR `odin-git` PKGBUILD, NOT from
+the AUR directly.** This keeps the AUR out of the trust path (fits the AUR
+off-limits posture): `makepkg` reads the forked recipe and fetches only its
+`source=` (the official `github.com/odin-lang/odin.git`); the AUR is never
+contacted, but full pacman integration is kept (`/usr/bin/odin`, `pacman -Q`,
+clean `pacman -R odin-git-local`).
+
+- **Repo:** `github.com/corruptmemory/odin-git-local` (PRIVATE, GitHub / `gh`).
+- **Install on a machine (this is the laptop `nomad-artix` TODO):**
+  ```bash
+  git clone git@github.com:corruptmemory/odin-git-local.git
+  cd odin-git-local && makepkg -si
+  ```
+- **pkgname** is `odin-git-local`, `provides/conflicts=(odin odin-git)` — cannot
+  coexist with AUR `odin-git`, still satisfies `odin` deps.
+
+**Why the fork exists:** the AUR `odin-git` `check()` went stale against upstream
+(broken since ~`2026-07-14`). Two causes: (1) upstream PR #7034 (commit
+`f308d92`) replaced the vendor Makefiles (`vendor/{stb,cgltf,miniaudio}/src/`)
+with `build_*.sh` scripts, so `make -C vendor/stb/src` fails ("No targets
+specified and no makefile found", exit 4); (2) `examples/all` now also imports
+the `kb_text_shape` vendor lib the recipe never built. Our `check()` mirrors
+upstream `.github/workflows/ci.yml` (build the 4 vendor libs the CI way, then
+`odin check examples/all -strict-style`) and drops the four heavy `odin test`
+suites. Full rationale in the repo's `README.md`.
+
+**Maintenance:** it is a `-git` package (always builds master), so `check()` can
+break again whenever upstream changes its build/test layout. On a `check()`
+failure: diff upstream `ci.yml` vs our `check()`, re-sync, bump `pkgrel`,
+`makepkg --printsrcinfo > .SRCINFO`, commit, push, then `git pull && makepkg -si`
+on both machines. (Desktop `godlike-artix` done `2026-08-03`.)
+
 ## Jai Language Skill — a compile-verified reference (`~/.claude/skills/jai-language/`)
 
 Jai is not in wide use, so model training data on it is sparse and badly out of date. The
