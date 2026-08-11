@@ -550,7 +550,7 @@ contacted, but full pacman integration is kept (`/usr/bin/odin`, `pacman -Q`,
 clean `pacman -R odin-git-local`).
 
 - **Repo:** `github.com/corruptmemory/odin-git-local` (PRIVATE, GitHub / `gh`).
-- **Install on a machine (this is the laptop `nomad-artix` TODO):**
+- **Install on a machine:**
   ```bash
   git clone git@github.com:corruptmemory/odin-git-local.git
   cd odin-git-local && makepkg -si
@@ -572,7 +572,9 @@ suites. Full rationale in the repo's `README.md`.
 break again whenever upstream changes its build/test layout. On a `check()`
 failure: diff upstream `ci.yml` vs our `check()`, re-sync, bump `pkgrel`,
 `makepkg --printsrcinfo > .SRCINFO`, commit, push, then `git pull && makepkg -si`
-on both machines. (Desktop `godlike-artix` done `2026-08-03`.)
+on both machines. (Desktop `godlike-artix` done `2026-08-03`; laptop
+`nomad-artix` done `2026-08-11` — installed at `r18504.5f321d687-1`, verified
+compile+run smoke test.)
 
 ## Jai Language Skill — a compile-verified reference (`~/.claude/skills/jai-language/`)
 
