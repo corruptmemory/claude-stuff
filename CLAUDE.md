@@ -140,19 +140,32 @@ find ~/.claude/plugins/cache -path '*/playwright/*/.mcp.json'
 ## chrome-devtools-mcp + WebMCP — install on every Brave Origin machine
 
 > ✅ Brave → Brave Origin migration (2026-06): paths below point at `Brave-Origin`.
-> WebMCP IS supported in Brave Origin — **verified on 149.1.91.175** (Chromium
-> 149): both `chrome://flags#enable-webmcp-testing` (the WebMCP API + testing
-> interfaces) and `chrome://flags#devtools-webmcp-support` (the DevTools WebMCP
-> category) are present and Enabled. The *stripped* Origin build keeps WebMCP.
-> Origin is a version AHEAD of the "Brave 148" this section was first written
-> against — version numbers below were bumped to 149 to match.
+> WebMCP IS supported in Brave Origin and is PROVEN working end-to-end — **re-verified
+> on Brave Origin 152.1.94.117 (Chromium 152), 2026-08-28**: both
+> `chrome://flags#enable-webmcp-testing` and `chrome://flags#devtools-webmcp-support`
+> are present and Enabled, and a self-registered demo page's tools were discovered and
+> executed over CDP. The *stripped* Origin build keeps WebMCP.
+>
+> ⚠️ **API RENAME (Chrome 150): the page entry point is now `document.modelContext`, NOT
+> `navigator.modelContext`.** On Chromium 152 `navigator.modelContext` and
+> `navigator.modelContextTesting` are GONE; the interface `window.ModelContext` remains, and
+> the working entry point is `document.modelContext` (methods `registerTool`, `getTools`,
+> `executeTool`, `ontoolchange`). Agent-side consumption = `document.modelContext.getTools()` /
+> `.executeTool(tool, jsonArgs)` over CDP — the `modelContextTesting` harness is gone and is NOT
+> restorable by any flag (tested `--enable-blink-test-features`, `--enable-experimental-web-platform-features`,
+> `--enable-features=WebMCP`, `--enable-blink-features=WebMCP`; none bring it back). All probes/examples
+> below were updated `navigator.` → `document.`.
+>
+> ⚠️ **Ignore any "Brave Origin strips WebMCP" claim** (e.g. a Google AI Overview): it conflates
+> **Brave Leo** (an AI assistant Origin *does* strip) with **WebMCP** (an upstream Chromium web
+> API Origin *keeps*). Ground truth: `document.modelContext` is live in Origin — the claim is wrong.
 
-Brave Origin 149+ ships the WebMCP browser API (`navigator.modelContext`, `navigator.modelContextTesting`) behind two `chrome://flags` toggles — `#enable-webmcp-testing` (the API + testing interfaces) and `#devtools-webmcp-support` (the DevTools WebMCP category). To let Claude Code drive a WebMCP-aware page through that Brave, you need three pieces wired together: Brave running with the flag on and `--remote-debugging-port=9222`, the `chrome-devtools-mcp` plugin installed, and the plugin's cached manifest hand-patched to point at your Brave on that port. **The patch matters** — by default the plugin spawns its own Puppeteer-managed Chrome that does NOT have the WebMCP flag, so without step 4 below you get generic devtools against a throwaway browser instead of WebMCP against your actual Brave.
+Brave Origin ships the WebMCP browser API (page entry point `document.modelContext` — renamed from `navigator.modelContext` in Chrome 150; see the ⚠️ note above) behind two `chrome://flags` toggles — `#enable-webmcp-testing` (the API + testing interfaces) and `#devtools-webmcp-support` (the DevTools WebMCP category). To let Claude Code drive a WebMCP-aware page through that Brave, you need three pieces wired together: Brave running with the flag on and `--remote-debugging-port=9222`, the `chrome-devtools-mcp` plugin installed, and the plugin's cached manifest hand-patched to point at your Brave on that port. **The patch matters** — by default the plugin spawns its own Puppeteer-managed Chrome that does NOT have the WebMCP flag, so without step 4 below you get generic devtools against a throwaway browser instead of WebMCP against your actual Brave.
 
 ### Bootstrap order (per machine)
 
 ```bash
-# 1. Enable the chrome://flags toggles (once). Brave Origin 149 exposes BOTH:
+# 1. Enable the chrome://flags toggles (once). Brave Origin 152 exposes BOTH:
 #      chrome://flags#enable-webmcp-testing   → Enabled  (WebMCP API + testing)
 #      chrome://flags#devtools-webmcp-support → Enabled  (DevTools WebMCP category)
 #    Then Relaunch. Verify (Brave can be running):
@@ -164,7 +177,7 @@ jq -r '.browser.enabled_labs_experiments[]' \
 #    Typically baked into your launcher .desktop file or window-manager config.
 #    Verify:
 curl -s http://127.0.0.1:9222/json/version | jq -r .Browser
-# expect: Chrome/149.x.x.x (or newer)
+# expect: Chrome/152.x.x.x (or newer)
 
 # 3. Install the plugin (user-scope auto-applied).
 claude plugin install chrome-devtools-mcp
@@ -175,9 +188,10 @@ claude plugin install chrome-devtools-mcp
 #    (flagless) Puppeteer Chrome.  Idempotent — safe to re-run after updates.
 for DIR in ~/.claude/plugins/cache/claude-plugins-official/chrome-devtools-mcp/*/; do
     for f in "${DIR}.mcp.json" "${DIR}.claude-plugin/plugin.json"; do
+        [ -f "$f" ] || continue   # layout is version-pinned .claude-plugin/plugin.json; no top-level .mcp.json
         jq '.mcpServers["chrome-devtools"].args |=
-            (. - ["--browserUrl", "http://127.0.0.1:9222"])
-            + ["--browserUrl", "http://127.0.0.1:9222"]' \
+            (. - ["--browserUrl", "http://127.0.0.1:9222", "--categoryExperimentalWebmcp"])
+            + ["--browserUrl", "http://127.0.0.1:9222", "--categoryExperimentalWebmcp"]' \
             "$f" > "$f.new" && mv "$f.new" "$f"
     done
 done
@@ -187,12 +201,12 @@ done
 
 # 6. Verify the plugin connects through to your Brave (not its own Chrome).
 claude mcp list | grep chrome-devtools
-# expect: plugin:chrome-devtools-mcp:chrome-devtools: npx chrome-devtools-mcp@latest --browserUrl http://127.0.0.1:9222 - ✓ Connected
+# expect: plugin:chrome-devtools-mcp:chrome-devtools: npx chrome-devtools-mcp@latest --browserUrl http://127.0.0.1:9222 --categoryExperimentalWebmcp - ✓ Connected
 ```
 
 ### Verify WebMCP is actually exposed in Brave
 
-Direct CDP probe via Node's built-in `WebSocket` (Node 21+, no npm deps). Open any real (non-`chrome://`) page in Brave first:
+Direct CDP probe via Node's built-in `WebSocket` (Node 21+, no npm deps). Open any real (non-`chrome://`) page in Brave first. **On Chromium 150+ the entry point is `document.modelContext`** — the old `navigator.modelContext` / `navigator.modelContextTesting` were removed:
 
 ```bash
 node -e '
@@ -203,7 +217,7 @@ node -e '
   const ws = new WebSocket(targets[0].webSocketDebuggerUrl);
   await new Promise(r => ws.addEventListener("open", r, {once: true}));
   ws.send(JSON.stringify({id: 1, method: "Runtime.evaluate", params: {
-    expression: "JSON.stringify({mc: typeof navigator.modelContext, mct: typeof navigator.modelContextTesting})",
+    expression: "JSON.stringify({dm: typeof document.modelContext, nav: typeof navigator.modelContext})",
     returnByValue: true,
   }}));
   const msg = await new Promise(r => ws.addEventListener("message", e => r(JSON.parse(e.data)), {once: true}));
@@ -211,14 +225,32 @@ node -e '
   ws.close();
 })();
 '
-# expect: {"mc":"object","mct":"object"}
+# expect (Chromium 152+): {"dm":"object","nav":"undefined"}  — the page API is document.modelContext now.
+#   (Old Brave 149: navigator.modelContext/…Testing → {"mc":"object","mct":"object"}.)
+```
+
+### Consume a WebMCP page's tools as the agent (PROVEN 2026-08-28, Brave Origin 152)
+
+A WebMCP-aware page registers tools with `document.modelContext.registerTool({name, description,
+inputSchema, execute})`. Acting as the agent over CDP, discover + invoke them (async → `awaitPromise: true`):
+
+```js
+// inside Runtime.evaluate on the target page: awaitPromise:true, returnByValue:true
+(async () => {
+  const tools = await document.modelContext.getTools();                 // discover
+  const t = tools.find(x => x.name === "add_numbers");
+  return await document.modelContext.executeTool(t, JSON.stringify({a:2, b:40}));  // invoke
+})()
+// Proven end-to-end: a localhost demo registered add_numbers/reverse_text; getTools() found both,
+// executeTool() returned "The sum of 2 and 40 is 42." and the reversed string. No modelContextTesting
+// harness needed — that surface is gone on 152; the direct-CDP / DevTools path replaced it.
 ```
 
 ### Gotchas
 
 - **The cache patch is fragile.** `claude plugin update chrome-devtools-mcp` will overwrite both `.mcp.json` and `.claude-plugin/plugin.json` from upstream. Re-run step 4 after every plugin update. Long-term fix: either the upstream marketplace pin needs to restore the `--browserUrl` default, or the plugin manifest needs a `userConfig` section so `settings.json -> pluginConfigs.chrome-devtools-mcp@claude-plugins-official.mcpServers.chrome-devtools` can override the args durably. Worth a PR upstream when motivated.
-- **`--categoryExperimentalWebmcp` is now UNBLOCKED on Brave Origin 149.** This arg enables a dedicated WebMCP tool category inside chrome-devtools-mcp; it requires Chromium 149+ AND the `DevToolsWebMCPSupport` feature flag — both of which Brave Origin 149.1.91.175 satisfies (`#devtools-webmcp-support` is present and Enabled). The old Brave-148 blocker is gone, so add it to the plugin args (alongside `--browserUrl` in step 4) to get the dedicated category. (Not yet smoke-tested end-to-end here — confirm the category actually surfaces after enabling.)
-- **`evaluate_script` is the reliable path on Brave Origin 149.** Anything you can do via direct CDP JS eval against `navigator.modelContext` / `navigator.modelContextTesting`, the plugin can do via its `evaluate_script` tool — a solid fallback even if `--categoryExperimentalWebmcp` (above) isn't wired up.
+- **`--categoryExperimentalWebmcp` on Brave Origin 152.** This arg enables a dedicated WebMCP tool category inside chrome-devtools-mcp; it requires Chromium 149+ AND the `DevToolsWebMCPSupport` feature flag — both satisfied by Brave Origin 152 (`#devtools-webmcp-support` present and Enabled). Add it to the plugin args (alongside `--browserUrl` in step 4) to get the dedicated category. NOTE (2026-08-28): the underlying WebMCP is proven working end-to-end via raw CDP (`document.modelContext.getTools/executeTool`), but the *plugin* category is currently untested because the plugin lost its `--browserUrl` patch and spawns its own (missing) Chrome — re-apply step 4 + restart the session before relying on the category.
+- **Direct CDP eval is the reliable path on Brave Origin 152.** Anything you can do via direct CDP JS eval against `document.modelContext` (`getTools()` / `executeTool()`), the plugin can do via its `evaluate_script` tool — a solid fallback even if `--categoryExperimentalWebmcp` isn't wired up. This is exactly how the end-to-end proof ran (raw Node `WebSocket` → `Runtime.evaluate`), independent of the plugin.
 - **Permissions:** Don't forget to add the **chrome-devtools-mcp block** to `.claude/settings.local.json` per project — see the next section.
 
 ## MCP Plugin Permissions (stop the prompting)
@@ -417,6 +449,56 @@ glab mr create --fill --yes
 - Without `--yes`, glab drops into an interactive prompt that hangs in non-interactive contexts
 - `--repo` accepts `OWNER/REPO` or `GROUP/NAMESPACE/REPO` format, NOT a full `https://` URL
 - Auth token can expire silently — check with `glab auth status` before blaming flag syntax
+
+## Internet-access & research lanes — use them to their fullest
+
+**Principle — this is an ENABLING instruction, not a restriction:** your answers are only as good as
+the information you can reach, and Jim, as a human, can reach more of the web than a default agent can
+(logged-in pages, paywalls, sites that block bots). Close that gap. Reach for these lanes aggressively
+instead of settling for a model-only answer or a bot-blockable fetch. **Level the playing field.**
+
+Four lanes, best used in combination. Match the lane to the job; cross-check load-bearing facts across
+at least two lanes, and land anything that matters on a primary source. The ground-truth check beats the
+confident summary — on 2026-08-28 a Google AI Overview got WebMCP flatly wrong while a browser probe was right.
+
+### 1. Jim's real browser (his authenticated Brave) — strongest lane for ACCESS
+His logged-in, human-reputation Brave defeats paywalls, logins, and bot/agent blocks that stop fetch
+tools cold. Prefer it for reading real pages (details in the marksnip and "chrome-devtools-mcp + WebMCP" sections).
+- **Read a page:** `marksnip` — clean Markdown from his live/authenticated tab.
+- **Drive / run JS / read JS-heavy or gated pages:** raw CDP on `127.0.0.1:9222` (Brave launched with
+  `--remote-debugging-port=9222`) — `curl http://127.0.0.1:9222/json` to list tabs, then a Node 21+
+  `WebSocket` to a target's `webSocketDebuggerUrl` + `Runtime.evaluate`. Works even when the
+  chrome-devtools-mcp plugin is mis-patched (spawns its own Chrome) — the raw path needs no plugin.
+- **Interactive (click/type/forms):** `playwright-cli open --extension`, or the chrome-devtools-mcp plugin.
+- **WebMCP:** on cooperating pages, consume structured tools via `document.modelContext.getTools()` /
+  `.executeTool()` over CDP (proven end-to-end 2026-08-28).
+- **Boundary:** treat his email/banking/personal tabs as off-limits unless he assigns a task there.
+
+### 2. Perplexity (MCP, `✔ Connected`) — discovery + web-grounded synthesis with citations
+`perplexity_search` (find URLs/facts/recent news), `perplexity_ask` (cited answers, fast),
+`perplexity_research` (deep, slow), `perplexity_reason` (step-by-step). Great for mapping terrain and
+finding authoritative URLs — then read the load-bearing sources through his browser (lane 1). The
+citations are checkable; check them.
+
+### 3. `codex` CLI — a second, independent AI-agent lane
+OpenAI's Codex CLI (`codex-cli`, native install at `~/.local/bin/codex`). Non-interactive:
+**`codex exec "<prompt>"`** (alias `codex e`); `codex review` for non-interactive code review. Use it as a
+parallel/independent worker — a separate research pass, an API-hitting task, or a cross-check against my
+own conclusion (it has its own model + tool access). Verify its output like any agent's; it can be
+confidently wrong.
+
+### 4. `agy` CLI — Google-grounded breadth lane (⚠️ caveated)
+**`agy --print "<prompt>"`** (`-p`; `--output-format text|json|stream-json`, `--json-schema` for structured
+output, `--model`, `--effort low|medium|high`). Google-grounded, so good for BREADTH and leads.
+**⚠️ agy FABRICATES specifics** — in the 2026-08-10 AUR supply-chain assessment its lane invented details;
+nothing it returns is load-bearing. Use it ONLY for discovery/leads, and confirm every concrete claim
+(dates, versions, quotes, URLs) against a primary source or lane 1/2 before relying on it.
+
+### Combining the lanes
+- Breadth / discovery: perplexity + agy (agy strictly for leads).
+- Read the real / authoritative / gated content: his browser (lane 1).
+- Independent second opinion or parallel grind: codex.
+- Always: cross-check load-bearing facts across ≥2 lanes and settle them on a primary source.
 
 ## marksnip (preferred web page reading)
 
