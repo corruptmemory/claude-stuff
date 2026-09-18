@@ -285,7 +285,7 @@ The `mcp__*` wildcard in global `settings.json` does NOT actually suppress promp
 
 Tool names follow the pattern `mcp__plugin_<pluginname>_<servername>__<toolname>` for plugin-hosted servers, or `mcp__<servername>__<toolname>` for directly-registered servers (like open-brain and perplexity — these were added via `claude mcp add`, not via the plugin system, so they skip the `plugin_` infix).
 
-**Drift check — do this every time you apply the recipe.** Plugins and connectors rename, add, and drop tools without notice (2026-09-04: playwright renamed `browser_run_code` → `browser_run_code_unsafe` and dropped `browser_install`; the Gmail connector grew `send_message`/`reply`/`forward`). The ground truth for current tool names is the session's own deferred-tool listing (the `mcp__…` names Claude Code prints at session start), NOT this file. Diff each block below against it before pasting. New read-only or reversible tools: add them here and in the project. New outward-facing (send mail, share files) or destructive (trash, delete) tools: leave them OUT so they keep prompting, and say so in the summary — never silently auto-allow them. Blocks last re-verified against live tool names on `godlike-artix` **2026-09-18** — every existing block matched the live listing exactly (no renames, no drops); the only change that day was a new `claude.ai Claude Docs` connector, which got its own block below.
+**Drift check — do this every time you apply the recipe.** Plugins and connectors rename, add, and drop tools without notice (2026-09-04: playwright renamed `browser_run_code` → `browser_run_code_unsafe` and dropped `browser_install`; the Gmail connector grew `send_message`/`reply`/`forward`). The ground truth for current tool names is the session's own deferred-tool listing (the `mcp__…` names Claude Code prints at session start), NOT this file. Diff each block below against it before pasting. New read-only or reversible tools: add them here and in the project. Outward-facing (send mail, share files) or destructive (trash, delete) tools stay OUT so they keep prompting, whether they are new or already sit in a block, and say so in the summary — never silently auto-allow them. Applied to every block on 2026-09-18: `delete_thought`, Gmail `delete_label`, and Calendar `delete_event` were removed. One deliberate exception: `mcp__open-brain__coalesce_thoughts` stays auto-allowed. It deletes its inputs, but only by substituting one merged thought for them, and Jim judged Claude's use of it sound on average (2026-09-18). Blocks last re-verified against live tool names on `godlike-artix` **2026-09-18** — every existing block matched the live listing exactly (no renames, no drops); the only change that day was a new `claude.ai Claude Docs` connector, which got its own block below.
 
 ---
 
@@ -326,10 +326,11 @@ Playwright tool set as of `@playwright/mcp@latest` on 2026-09-04: `browser_run_c
 
 ### open-brain block (add whenever `open-brain` is in `claude mcp list` — should be every machine)
 
+Deliberately excluded (must keep prompting): `mcp__open-brain__delete_thought`. `coalesce_thoughts` also deletes, but as a substitution: it replaces a set of overlapping or redundant thoughts with one merged thought. It stays in the block by Jim's decision (2026-09-18).
+
 ```json
 "mcp__open-brain__capture_thought",
 "mcp__open-brain__coalesce_thoughts",
-"mcp__open-brain__delete_thought",
 "mcp__open-brain__find_similar_thoughts",
 "mcp__open-brain__list_thoughts",
 "mcp__open-brain__search_thoughts",
@@ -385,16 +386,15 @@ Includes the two WebMCP-category tools (`list_webmcp_tools`, `execute_webmcp_too
 
 ### Google Workspace block (add when `claude.ai Gmail` / `claude.ai Google Drive` / `claude.ai Google Calendar` are `✔ Connected` in `claude mcp list`)
 
-These are claude.ai OAuth cloud connectors — `mcp__claude_ai_<Server>__<tool>` (a `claude_ai_` prefix, no `plugin_` infix). **As of 2026-09-04 the Gmail connector DOES expose send tools** (`send_message`, `reply`, `forward`) plus `trash_*` and `mark_*_spam`, and Drive gained `share_file` / `trash_file` — the older "Gmail has no send tool" note is obsolete. Those outward-facing and destructive tools are **deliberately left OUT of the block below**, so auto-allowing it still cannot send mail, share files, or throw anything away on your behalf; they keep prompting. Everything else IS included — read tools, label + draft edits (incl. `get_draft`, `update_message_labels`), the restorative `untrash_*` / `unmark_*_spam`, Calendar `create`/`update`/`delete_event`, Drive `create_file`/`copy_file`/`update_file`. Trim to the read-only subset (`search_*`, `list_*`, `get_*`, `read_file_content`, `download_file_content`) if you'd rather be prompted before any mutation.
+These are claude.ai OAuth cloud connectors — `mcp__claude_ai_<Server>__<tool>` (a `claude_ai_` prefix, no `plugin_` infix). **As of 2026-09-04 the Gmail connector DOES expose send tools** (`send_message`, `reply`, `forward`) plus `trash_*` and `mark_*_spam`, and Drive gained `share_file` / `trash_file` — the older "Gmail has no send tool" note is obsolete. Those outward-facing and destructive tools are **deliberately left OUT of the block below**, so auto-allowing it still cannot send mail, share files, or throw anything away on your behalf; they keep prompting. Everything else IS included — read tools, label + draft edits (incl. `get_draft`, `update_message_labels`), the restorative `untrash_*` / `unmark_*_spam`, Calendar `create`/`update_event`, Drive `create_file`/`copy_file`/`update_file`. Trim to the read-only subset (`search_*`, `list_*`, `get_*`, `read_file_content`, `download_file_content`) if you'd rather be prompted before any mutation. Open question (2026-09-18): Calendar `create_event`, `update_event`, and `respond_to_event` may email attendees, depending on how the connector sends updates. If they do, they are outward-facing and belong in the excluded list.
 
-Deliberately excluded (must keep prompting): `mcp__claude_ai_Gmail__send_message`, `…__reply`, `…__forward`, `…__trash_message`, `…__trash_thread`, `…__mark_message_spam`, `…__mark_thread_spam`, `mcp__claude_ai_Google_Drive__share_file`, `…__trash_file`.
+Deliberately excluded (must keep prompting): `mcp__claude_ai_Gmail__send_message`, `…__reply`, `…__forward`, `…__trash_message`, `…__trash_thread`, `…__mark_message_spam`, `…__mark_thread_spam`, `…__delete_label`, `mcp__claude_ai_Google_Calendar__delete_event`, `mcp__claude_ai_Google_Drive__share_file`, `…__trash_file`.
 
 ```json
 "mcp__claude_ai_Gmail__apply_sensitive_message_label",
 "mcp__claude_ai_Gmail__apply_sensitive_thread_label",
 "mcp__claude_ai_Gmail__create_draft",
 "mcp__claude_ai_Gmail__create_label",
-"mcp__claude_ai_Gmail__delete_label",
 "mcp__claude_ai_Gmail__get_draft",
 "mcp__claude_ai_Gmail__get_message",
 "mcp__claude_ai_Gmail__get_thread",
@@ -413,7 +413,6 @@ Deliberately excluded (must keep prompting): `mcp__claude_ai_Gmail__send_message
 "mcp__claude_ai_Gmail__update_label",
 "mcp__claude_ai_Gmail__update_message_labels",
 "mcp__claude_ai_Google_Calendar__create_event",
-"mcp__claude_ai_Google_Calendar__delete_event",
 "mcp__claude_ai_Google_Calendar__get_event",
 "mcp__claude_ai_Google_Calendar__list_calendars",
 "mcp__claude_ai_Google_Calendar__list_events",
