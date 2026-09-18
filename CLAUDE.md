@@ -262,7 +262,7 @@ inputSchema, execute})`. Acting as the agent over CDP, discover + invoke them (a
 ### Gotchas
 
 - **The cache patch is fragile.** `claude plugin update chrome-devtools-mcp` will overwrite both `.mcp.json` and `.claude-plugin/plugin.json` from upstream. Re-run step 4 after every plugin update. Long-term fix: either the upstream marketplace pin needs to restore the `--browserUrl` default, or the plugin manifest needs a `userConfig` section so `settings.json -> pluginConfigs.chrome-devtools-mcp@claude-plugins-official.mcpServers.chrome-devtools` can override the args durably. Worth a PR upstream when motivated.
-- **`--categoryExperimentalWebmcp` on Brave Origin 152.** This arg enables a dedicated WebMCP tool category inside chrome-devtools-mcp; it requires Chromium 149+ AND the `DevToolsWebMCPSupport` feature flag — both satisfied by Brave Origin 152 (`#devtools-webmcp-support` present and Enabled). Add it to the plugin args (alongside `--browserUrl` in step 4) to get the dedicated category. VERIFIED 2026-09-03 (chrome-devtools-mcp 1.8.0, Brave Origin 152): with step 4 applied, the plugin exposes a dedicated WebMCP category — `list_webmcp_tools` and `execute_webmcp_tool` — both now in the permissions block below. The 1.7.0 → 1.8.0 auto-update DID drop the patch (a fresh, unpatched version directory appeared beside the patched 1.7.0 one; `claude mcp list` showed a bare `npx chrome-devtools-mcp@1.8.0`); re-applied 2026-09-03. The "re-run step 4 after every update" rule is real, not theoretical. Raw CDP (`document.modelContext.getTools/executeTool`) remains proven independently (2026-08-28).
+- **`--categoryExperimentalWebmcp` on Brave Origin 152.** This arg enables a dedicated WebMCP tool category inside chrome-devtools-mcp; it requires Chromium 149+ AND the `DevToolsWebMCPSupport` feature flag — both satisfied by Brave Origin 152 (`#devtools-webmcp-support` present and Enabled). Add it to the plugin args (alongside `--browserUrl` in step 4) to get the dedicated category. VERIFIED 2026-09-03 (chrome-devtools-mcp 1.8.0, Brave Origin 152): with step 4 applied, the plugin exposes a dedicated WebMCP category — `list_webmcp_tools` and `execute_webmcp_tool` — both now in the permissions block below. The 1.7.0 → 1.8.0 auto-update DID drop the patch (a fresh, unpatched version directory appeared beside the patched 1.7.0 one; `claude mcp list` showed a bare `npx chrome-devtools-mcp@1.8.0`); re-applied 2026-09-03. Dropped AGAIN by the 1.8.0 → 1.9.0 auto-update (fresh unpatched `1.9.0/` dir beside the patched `1.8.0/`; `claude mcp list` showed a bare `npx chrome-devtools-mcp@1.9.0`); re-applied 2026-09-14 with Brave Origin on Chromium 153 (flags still Enabled, `document.modelContext` probe still live). The "re-run step 4 after every update" rule is real, not theoretical — two for two so far. Raw CDP (`document.modelContext.getTools/executeTool`) remains proven independently (2026-08-28).
 - **Direct CDP eval is the reliable path on Brave Origin 152.** Anything you can do via direct CDP JS eval against `document.modelContext` (`getTools()` / `executeTool()`), the plugin can do via its `evaluate_script` tool — a solid fallback even if `--categoryExperimentalWebmcp` isn't wired up. This is exactly how the end-to-end proof ran (raw Node `WebSocket` → `Runtime.evaluate`), independent of the plugin.
 - **Permissions:** Don't forget to add the **chrome-devtools-mcp block** to `.claude/settings.local.json` per project — see the next section.
 
@@ -275,21 +275,23 @@ The `mcp__*` wildcard in global `settings.json` does NOT actually suppress promp
 1. Run `claude mcp list` to see which MCP servers are connected on this machine.
 2. Always include the **Base plugins block** below (playwright + context7). (Serena was fully uninstalled 2026-08-01 — usage analysis showed 5 calls in two months against a 33-line permissions block per project. Do not re-add its entries.)
 3. **ALWAYS** check for `open-brain` in `claude mcp list`. If present (expected on every machine — see the "Open Brain" section), add the **open-brain block**. If it's *missing*, stop and bootstrap open-brain before continuing — a machine without open-brain is amnesiac relative to the rest of the fleet.
-4. Check for `perplexity` in `claude mcp list`. If present, add the **perplexity block**.
+4. Check for `perplexity` in `claude mcp list`. If present, add the **perplexity block**. Scope gotcha (`godlike-artix`, 2026-09-18): perplexity is registered **project-local** — `claude mcp add`'s default scope, stored under `projects[<dir>].mcpServers` in `~/.claude.json`, ~30 dirs so far — so it only appears in `claude mcp list` when run from a directory it was added in. Absent from the list means "not added *here* yet", not "not installed"; `claude mcp add perplexity … --scope user` once would make it fleet-wide like open-brain. Re-added in `jai-http` 2026-09-18; block matched the live listing (4 tools) exactly.
 5. Check for `plugin:chrome-devtools-mcp:chrome-devtools` in `claude mcp list`. If present (expected on every machine with a debug-enabled Brave — see the "chrome-devtools-mcp + WebMCP" section above), add the **chrome-devtools-mcp block**.
 6. Check for the claude.ai **Google Workspace** connectors — `claude.ai Gmail`, `claude.ai Google Drive`, `claude.ai Google Calendar` — in `claude mcp list`. If present and `✔ Connected`, add the **Google Workspace block**. These are OAuth *cloud connectors managed by claude.ai* (enabled/authed from the `/plugin` → connectors UI or claude.ai), **not** `claude mcp add` and **not** plugins — so their tool names use the `mcp__claude_ai_<Server>__<tool>` shape (a `claude_ai_` prefix, no `plugin_` infix). Verified `✔ Connected` on `godlike-artix` 2026-08-01, re-verified 2026-09-04. Note: the older Anthropic-hosted Google connectors (`gmail.mcp.claude.com`, `gcal.mcp.claude.com`) are deprecated and sit in a local blocked-hosts flag; the *current* ones are Google-hosted (`gmailmcp.googleapis.com`, `calendarmcp.googleapis.com`, `drivemcp.googleapis.com`) and are unaffected by that flag.
 7. Check for the claude.ai **Plaud** connector — `claude.ai Plaud` (`https://mcp.plaud.ai/mcp`) — in `claude mcp list`. If `✔ Connected`, add the **Plaud block**. Same kind of claude.ai OAuth cloud connector as the Google ones (same `mcp__claude_ai_<Server>__<tool>` shape, not `claude mcp add`, not a plugin). Connected on `godlike-artix` 2026-09-04.
-8. If any other MCP server shows up that prompts during use, enumerate its tools the same way and consider whether it's worth adding to this recipe for future projects.
+8. Check for the claude.ai **Claude Docs** connector — `claude.ai Claude Docs` (`https://api.anthropic.com/v1/pages/mcp`) — in `claude mcp list`. If `✔ Connected`, add the **Claude Docs block**. Same claude.ai OAuth cloud-connector shape as the Google and Plaud ones (`mcp__claude_ai_Claude_Docs__<tool>`, not `claude mcp add`, not a plugin). Connected on `godlike-artix` 2026-09-18.
+9. If any other MCP server shows up that prompts during use, enumerate its tools the same way and consider whether it's worth adding to this recipe for future projects.
+   - 2026-09-14: `claude.ai Microsoft 365` and `claude.ai Slack` show up as `! Needs authentication` and expose only `authenticate` / `complete_authentication` (OAuth-flow stubs, outward-facing). Leave them OUT until one is actually connected and its real tool set is enumerated; then decide block-by-block like the Google ones.
 
 Tool names follow the pattern `mcp__plugin_<pluginname>_<servername>__<toolname>` for plugin-hosted servers, or `mcp__<servername>__<toolname>` for directly-registered servers (like open-brain and perplexity — these were added via `claude mcp add`, not via the plugin system, so they skip the `plugin_` infix).
 
-**Drift check — do this every time you apply the recipe.** Plugins and connectors rename, add, and drop tools without notice (2026-09-04: playwright renamed `browser_run_code` → `browser_run_code_unsafe` and dropped `browser_install`; the Gmail connector grew `send_message`/`reply`/`forward`). The ground truth for current tool names is the session's own deferred-tool listing (the `mcp__…` names Claude Code prints at session start), NOT this file. Diff each block below against it before pasting. New read-only or reversible tools: add them here and in the project. New outward-facing (send mail, share files) or destructive (trash, delete) tools: leave them OUT so they keep prompting, and say so in the summary — never silently auto-allow them. Blocks last re-verified against live tool names on `godlike-artix` **2026-09-04**.
+**Drift check — do this every time you apply the recipe.** Plugins and connectors rename, add, and drop tools without notice (2026-09-04: playwright renamed `browser_run_code` → `browser_run_code_unsafe` and dropped `browser_install`; the Gmail connector grew `send_message`/`reply`/`forward`). The ground truth for current tool names is the session's own deferred-tool listing (the `mcp__…` names Claude Code prints at session start), NOT this file. Diff each block below against it before pasting. New read-only or reversible tools: add them here and in the project. New outward-facing (send mail, share files) or destructive (trash, delete) tools: leave them OUT so they keep prompting, and say so in the summary — never silently auto-allow them. Blocks last re-verified against live tool names on `godlike-artix` **2026-09-18** — every existing block matched the live listing exactly (no renames, no drops); the only change that day was a new `claude.ai Claude Docs` connector, which got its own block below.
 
 ---
 
 ### Base plugins block (always include)
 
-Playwright tool set as of `@playwright/mcp@latest` on 2026-09-04: `browser_run_code` was renamed `browser_run_code_unsafe`, `browser_install` is gone (fine — this file already says never run playwright's installer on Arch), and `browser_drop`, `browser_find`, `browser_network_request` (singular, one request by id) were added. context7 is in the block on principle; it did not appear in `claude mcp list` on 2026-09-04, and unmatched entries are harmless.
+Playwright tool set as of `@playwright/mcp@latest` on 2026-09-04: `browser_run_code` was renamed `browser_run_code_unsafe`, `browser_install` is gone (fine — this file already says never run playwright's installer on Arch), and `browser_drop`, `browser_find`, `browser_network_request` (singular, one request by id) were added. context7 is in the block on principle; it did not appear in `claude mcp list` on 2026-09-04, and unmatched entries are harmless. 2026-09-14 drift: playwright added `browser_webmcp_list` / `browser_webmcp_call` (WebMCP discovery + invoke through the Playwright plugin — the counterpart of chrome-devtools' `list_webmcp_tools` / `execute_webmcp_tool`); both added to the block, per the 🧟 WebMCP standing policy.
 
 ```json
 "mcp__plugin_playwright_playwright__browser_close",
@@ -316,6 +318,8 @@ Playwright tool set as of `@playwright/mcp@latest` on 2026-09-04: `browser_run_c
 "mcp__plugin_playwright_playwright__browser_select_option",
 "mcp__plugin_playwright_playwright__browser_tabs",
 "mcp__plugin_playwright_playwright__browser_wait_for",
+"mcp__plugin_playwright_playwright__browser_webmcp_call",
+"mcp__plugin_playwright_playwright__browser_webmcp_list",
 "mcp__plugin_context7_context7__resolve-library-id",
 "mcp__plugin_context7_context7__query-docs"
 ```
@@ -448,6 +452,30 @@ loads the fresh list, to print the names —
 "mcp__claude_ai_Plaud__get_note",
 "mcp__claude_ai_Plaud__get_transcript",
 "mcp__claude_ai_Plaud__list_files"
+```
+
+### Claude Docs block (add when `claude.ai Claude Docs` is `✔ Connected` in `claude mcp list`)
+
+Claude Docs is the claude.ai living-documents connector (`https://api.anthropic.com/v1/pages/mcp`) —
+docs Claude creates and edits in place, private by default. Same claude.ai OAuth cloud-connector shape
+as the Google and Plaud ones (`mcp__claude_ai_Claude_Docs__<tool>`, not `claude mcp add`, not a
+plugin). First seen `✔ Connected` on `godlike-artix` 2026-09-18; tool names enumerated from the
+session's deferred-tool listing the same day (eight tools). Seven are read-only (`guide`, `read`,
+`query`, `export`) or edits to the user's own private docs (`batch`, `create`, `update`) — the same
+class as Drive `create_file`/`update_file`, which the Google block already auto-allows — and are
+included. **`delete` is destructive and is deliberately left OUT** so it keeps prompting, matching
+the `trash_*` exclusions in the Google block.
+
+Deliberately excluded (must keep prompting): `mcp__claude_ai_Claude_Docs__delete`.
+
+```json
+"mcp__claude_ai_Claude_Docs__batch",
+"mcp__claude_ai_Claude_Docs__create",
+"mcp__claude_ai_Claude_Docs__export",
+"mcp__claude_ai_Claude_Docs__guide",
+"mcp__claude_ai_Claude_Docs__query",
+"mcp__claude_ai_Claude_Docs__read",
+"mcp__claude_ai_Claude_Docs__update"
 ```
 
 ---
