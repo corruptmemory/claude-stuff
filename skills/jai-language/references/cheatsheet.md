@@ -654,7 +654,7 @@ for 0..size-1 #no_abc #no_aoc {        // no array bounds check, no auto output 
 ```
 
 ### Standalone #no_aoc / #no_abc Block Statements
-<!-- compile-verified: beta 0.2.030 | compendium/16 -->
+<!-- compile-verified: beta 0.2.030 | compendium/16, 35 -->
 ```jai
 // #no_aoc can wrap an arbitrary block of statements (NOT just for-loops)
 // This disables arithmetic overflow checking for the enclosed operations
@@ -678,6 +678,18 @@ for 0..size-1 #no_abc #no_aoc {        // no array bounds check, no auto output 
 
 ### Other
 ```jai
+// ── defer ORDERING and SCOPE (beta 0.2.030; proven by compendium/35) ───────────
+// 1. LIFO within a scope: the LAST defer registered runs FIRST (as in Go/Zig/Swift).
+//    Reading top-to-bottom this feels inverted -- a teardown written LOWER in the file
+//    runs EARLIER than one written above it.
+// 2. A defer belongs to its ENCLOSING BLOCK, not the function: one inside `{ }` runs
+//    at that block's exit, not at function exit.
+// 3. A defer in a loop body runs once PER ITERATION, at the end of that iteration.
+// 4. A defer fires on an early `return` as well as on falling off the end.
+// PRACTICAL RULE: register each teardown IMMEDIATELY AFTER the acquisition it undoes,
+// and nesting comes out right for free (B acquired after A is torn down before A).
+// The bug is registering teardowns out of order relative to their acquisitions --
+// LIFO then faithfully unwinds them in the wrong order.
 defer stmt;                             // deferred execution
 defer { block; }                        // deferred block
 push_context new_ctx { ... }           // context switch scope with expression

@@ -14,12 +14,41 @@ The Jai compiler distribution at `~/jai/jai/` contains the authoritative source:
 
 See [references/cheatsheet.md](references/cheatsheet.md) for the full language cheat sheet.
 See [compendium/](compendium/) for compilable code samples demonstrating every language feature
-(34 entries: 33 single `.jai` files + the `30_module_parameters/` subdirectory entry).
+(35 entries: 34 single `.jai` files + the `30_module_parameters/` subdirectory entry).
 See [references/build-variables-recipe.md](references/build-variables-recipe.md) for the canonical
 metaprogram recipe for custom compile-time build variables (`#placeholder` knobs module +
 `Message_Import`-scoped `add_build_string`) — including the beta 0.2.029 gated-`#load` bug the
 naive per-file injection hits. Use this recipe whenever a metaprogram needs to feed constants
 into target code.
+
+## STANDING RULE: document surprises as you hit them
+
+**Any Jai behaviour that surprises you relative to what this skill already says must be
+written down here, in the same pass that discovered it.** Jai is under heavy development
+and sparsely documented elsewhere; a surprise you do not record is one the next session
+pays for again. Two sessions in a row have lost time to behaviour this skill did not
+mention.
+
+What qualifies: anything you had to establish by experiment because the cheatsheet was
+silent or wrong, anything whose compiler error names the wrong cause, and anything that
+differs from the obvious analogue in Go/C/Odin/Zig.
+
+How to record it:
+
+1. **Tag it with the Jai version you observed it on.** The language changes; an untagged
+   claim rots silently and there is no way to tell later whether it was ever true.
+2. **Prove it in the compendium** — a new entry, or an addition to a fitting one — that
+   both COMPILES and RUNS clean, with asserts that would fail if the behaviour changed.
+   Behaviour that cannot be shown in compiling code (a compiler ERROR, say) goes in
+   comments with the exact message quoted, since the corpus must compile.
+3. **Add it to the cheatsheet** where someone would look for it, not only where it was
+   found, and extend that section's banner to name the proving entry.
+4. **Prefer strengthening an existing section** over a new one when the topic already
+   has a home; a surprise usually means a section was incomplete, not missing.
+
+Recorded this way so far: `compendium/34` (argument mutability — scalars are assignable,
+aggregates are not, and `x := x` is rejected) and `compendium/35` (defer ordering and
+scope). Both beta 0.2.030.
 
 ## Compendium verification requirement
 
