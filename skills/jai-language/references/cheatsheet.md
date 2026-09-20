@@ -75,9 +75,26 @@ a, d:, c = 4, 5, 6;                                 // d: declares new; a,c assi
 ```
 
 ## Procedures
-<!-- compile-verified: beta 0.2.030 | compendium/02, 10, 16 -->
+<!-- compile-verified: beta 0.2.030 | compendium/02, 10, 16, 34 -->
 
 ```jai
+// ── ARGUMENT MUTABILITY: scalars are mutable, aggregates are NOT ────────────────
+// Assigning to a struct/string/[N]T parameter is a COMPILE ERROR. This bites any
+// "take a config by value and tweak it" helper. Full matrix: compendium/34.
+name :: (n: int)    { n = 99; }        // OK  — int/float/bool/enum/pointer are assignable
+name :: (p: *int)   { p = null; }      // OK  — reseating the pointer is local
+name :: (p: *int)   { p.* = 99; }      // OK  — and THIS reaches the caller's storage
+name :: (a: [] int) { a[0] = 99; }     // OK  — slice ELEMENTS reach the caller too
+// name :: (p: Point)   { p.x = 99; }      // Error: Can't assign to an immutable argument.
+// name :: (s: string)  { s = "new"; }     // same — `string` is a struct {count, data}
+// name :: (a: [3] int) { a[0] = 99; }     // same — fixed arrays are aggregates
+// name :: (a: [] int)  { a.count = 0; }   // same — the slice HEADER is immutable
+// name :: (p: Point)   { p := p; }        // Error: Attempt to use a value inside its own declaration.
+// name :: (using p: Point) { x = 99; }    // Error: Attempt to modify a constant declaration by 'using' of its members.
+// The copy idiom: take the argument under one name, copy it into a local under another.
+tweak :: (base: Point) -> Point { p := base; p.x = 99; return p; }   // `p := base`, NOT `base := base`
+// A scalar's mutation is LOCAL — pass-by-value, the caller never sees it.
+
 // Basic
 name :: (a: int, b: int) -> int { return a + b; }
 name :: () { }                                     // void return

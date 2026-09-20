@@ -14,7 +14,7 @@ The Jai compiler distribution at `~/jai/jai/` contains the authoritative source:
 
 See [references/cheatsheet.md](references/cheatsheet.md) for the full language cheat sheet.
 See [compendium/](compendium/) for compilable code samples demonstrating every language feature
-(33 entries: 32 single `.jai` files + the `30_module_parameters/` subdirectory entry).
+(34 entries: 33 single `.jai` files + the `30_module_parameters/` subdirectory entry).
 See [references/build-variables-recipe.md](references/build-variables-recipe.md) for the canonical
 metaprogram recipe for custom compile-time build variables (`#placeholder` knobs module +
 `Message_Import`-scoped `add_build_string`) — including the beta 0.2.029 gated-`#load` bug the
