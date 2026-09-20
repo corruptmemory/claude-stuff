@@ -14,7 +14,7 @@ The Jai compiler distribution at `~/jai/jai/` contains the authoritative source:
 
 See [references/cheatsheet.md](references/cheatsheet.md) for the full language cheat sheet.
 See [compendium/](compendium/) for compilable code samples demonstrating every language feature
-(35 entries: 34 single `.jai` files + the `30_module_parameters/` subdirectory entry).
+(36 entries: 35 single `.jai` files + the `30_module_parameters/` subdirectory entry).
 See [references/build-variables-recipe.md](references/build-variables-recipe.md) for the canonical
 metaprogram recipe for custom compile-time build variables (`#placeholder` knobs module +
 `Message_Import`-scoped `add_build_string`) — including the beta 0.2.029 gated-`#load` bug the
@@ -46,9 +46,14 @@ How to record it:
 4. **Prefer strengthening an existing section** over a new one when the topic already
    has a home; a surprise usually means a section was incomplete, not missing.
 
-Recorded this way so far: `compendium/34` (argument mutability — scalars are assignable,
-aggregates are not, and `x := x` is rejected) and `compendium/35` (defer ordering and
-scope). Both beta 0.2.030.
+Recorded this way so far, all beta 0.2.030: `compendium/34` (argument mutability —
+scalars are assignable, aggregates are not, and `x := x` is rejected), `compendium/35`
+(defer ordering and scope), and `compendium/36` (scopes — a bare `{ }` is a real scope;
+`#if` and struct-literal braces are not).
+
+**A worked example of why step 2 says "and RUNS":** `compendium/36`'s first draft
+compiled clean and failed an assert at runtime, because a hand-counted string length was
+wrong. Compiling proves the signatures; only running proves the claim.
 
 ## Compendium verification requirement
 

@@ -654,7 +654,7 @@ for 0..size-1 #no_abc #no_aoc {        // no array bounds check, no auto output 
 ```
 
 ### Standalone #no_aoc / #no_abc Block Statements
-<!-- compile-verified: beta 0.2.030 | compendium/16, 35 -->
+<!-- compile-verified: beta 0.2.030 | compendium/16, 35, 36 -->
 ```jai
 // #no_aoc can wrap an arbitrary block of statements (NOT just for-loops)
 // This disables arithmetic overflow checking for the enclosed operations
@@ -678,6 +678,25 @@ for 0..size-1 #no_abc #no_aoc {        // no array bounds check, no auto output 
 
 ### Other
 ```jai
+// ── SCOPES: a bare { } is a REAL scope, not grouping (beta 0.2.030; compendium/36)
+// Nested blocks bound a name's lifetime, so you can reuse a name for a different
+// thing (even a different TYPE), and they bound `defer` too (see below).
+// CREATES a scope: a bare { }, a procedure body, an if/for/while body WITH OR
+//   WITHOUT braces, and EVERY `case` arm of an `if x == { ... }` automatically --
+//   the braces C and C++ make you write by hand.
+// Does NOT create a scope -- the two exceptions:
+//   `#if cond { decl; }`  -> decl lands in the ENCLOSING scope. `#if` exists to
+//                            insert declarations into the surrounding scope, so a
+//                            scope of its own would defeat it.
+//                            With an outer `x`: "Error: Redeclaration of 'x'."
+//   `Vector3.{1, 2, 3}`   -> struct-literal braces echo C; no declaration is legal
+//                            inside one anyway.
+// Data vs imperative scope (how_to/080_scopes.jai): a data scope (file top level, a
+// struct body) holds unordered declarations with no notion of time, so statements
+// needing a runtime moment are illegal there -- you cannot call a proc at top level.
+// No closures: a proc nested in another cannot see the outer proc's locals, since it
+// must be able to run after the outer one returned. Nesting scopes the NAME, not data.
+
 // ── defer ORDERING and SCOPE (beta 0.2.030; proven by compendium/35) ───────────
 // 1. LIFO within a scope: the LAST defer registered runs FIRST (as in Go/Zig/Swift).
 //    Reading top-to-bottom this feels inverted -- a teardown written LOWER in the file
