@@ -206,7 +206,7 @@ operator- :: Basic.operator-;          // import operator from another module
 ```
 
 ## Types
-<!-- compile-verified: beta 0.2.030 | compendium/06, 23 -->
+<!-- compile-verified: beta 0.2.030 | compendium/06, 23, 37 -->
 
 ### Primitives
 - `int` (s64), `u8` `u16` `u32` `u64`, `s8` `s16` `s32` `s64`
@@ -228,6 +228,15 @@ operator- :: Basic.operator-;          // import operator from another module
 [N] Type                       // fixed array
 [..] Type                      // dynamic array
 [] Type                        // slice/array view
+// ── which converts to which (beta 0.2.030; proven by compendium/37) ───────────
+//   [N]T   -> []T    by value    YES      [..]T  -> []T    by value    YES
+//   *[..]T -> *[]T   by pointer  YES      *[N]T  -> *[]T   by pointer  NO
+// A [..]T BEGINS with the same (count, data) pair a slice has, so a pointer to one is
+// already a valid *[]T. A fixed array is bare storage with no count field, so there is
+// nothing for a *[]T to point at: "Type mismatch. Type wanted: *[] s64; given: *[3] s64."
+// CONSEQUENCE: a signature like `pop :: (array: *[] $T)` (Basic/Array.jai:232) does NOT
+// mean "no dynamic arrays". pop(*my_dynamic_array) compiles and works. Do not hand-roll
+// a replacement to dodge a constraint that isn't there.
 #type (params) -> ReturnType   // explicit procedure type (see Type System for full details)
 (params) -> ReturnType         // bare procedure type (in type positions)
 (params)                       // bare void procedure type
