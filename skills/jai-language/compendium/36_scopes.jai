@@ -19,11 +19,23 @@
 //   - every `case` arm of an `if x == { ... }`, automatically — no braces needed, which
 //     is the thing C and C++ make you write out by hand
 //
-// WHAT DOES NOT CREATE A SCOPE — the two exceptions worth knowing
-//   - `#if`. A declaration inside `#if cond { ... }` lands in the ENCLOSING scope, so it
-//     collides with a same-named outer one: `Error: Redeclaration of 'x'.` This is
-//     deliberate — `#if` exists to insert declarations INTO the surrounding scope, and a
-//     scope of its own would defeat that.
+// WHAT DOES NOT CREATE A SCOPE
+//   - `#if`, and NOT as an exception to the rule. `#if` is a COMPILE-TIME SPLICING
+//     construct, in the lineage of the C preprocessor and Lisp macros — not a control
+//     flow statement that happens to run early. Its braces delimit the text to splice,
+//     they are not a block. Read that way, introducing no scope is the only sensible
+//     behaviour: `#if` exists to put declarations INTO the surrounding scope, and a
+//     scope of its own would defeat the entire feature.
+//
+//     The splice model is not a story; it makes a falsifiable prediction that a scope
+//     model does not, and the prediction holds (all three verified below in comments,
+//     since two of them are compile errors):
+//         #if true  { x := 10; }   with an outer x  ->  "Error: Redeclaration of 'x'."
+//         #if FALSE { x := 10; }   with an outer x  ->  COMPILES CLEAN
+//     Under a scope model those two are identical — both would be scopes, neither would
+//     collide. Under a splice model the false branch inserts NOTHING, so there is
+//     nothing to collide with. Observed: the splice behaviour.
+//
 //   - the braces of a struct literal, `Vector3.{1, 2, 3}`. They echo C's syntax; no
 //     declaration is legal inside one anyway.
 //
@@ -70,9 +82,16 @@ main :: () {
     while n < 2 { x := 8; n += 1; }
     assert(x == 5, "and a while body");
 
-    // WILL NOT COMPILE -- "Error: Redeclaration of 'x'." #if creates NO scope, so this
-    // declaration lands in main's scope and collides with the x above:
-    //     #if true { x := 10; }
+    // #if SPLICES into the enclosing scope rather than opening one. The pair below is
+    // the discriminating experiment: a scope model predicts these behave the same, a
+    // splice model predicts they differ, and they differ.
+    //
+    //     #if true  { x := 10; }   // Error: Redeclaration of 'x'  -- the decl landed HERE
+    //     #if false { x := 10; }   // compiles clean -- nothing was spliced at all
+    //
+    // The false form is legal, so it can be exercised for real:
+    #if false { x := 10; }
+    assert(x == 5, "a false #if spliced nothing; x is untouched and undisturbed");
 
     // Nested blocks let one name mean different things in sequence without inventing
     // x_pixels / x_logical / x_tmp. Each is dead at its block's closing brace.

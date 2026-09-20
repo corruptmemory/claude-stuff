@@ -684,11 +684,14 @@ for 0..size-1 #no_abc #no_aoc {        // no array bounds check, no auto output 
 // CREATES a scope: a bare { }, a procedure body, an if/for/while body WITH OR
 //   WITHOUT braces, and EVERY `case` arm of an `if x == { ... }` automatically --
 //   the braces C and C++ make you write by hand.
-// Does NOT create a scope -- the two exceptions:
-//   `#if cond { decl; }`  -> decl lands in the ENCLOSING scope. `#if` exists to
-//                            insert declarations into the surrounding scope, so a
-//                            scope of its own would defeat it.
-//                            With an outer `x`: "Error: Redeclaration of 'x'."
+// Does NOT create a scope:
+//   `#if cond { decl; }`  -> #if is a COMPILE-TIME SPLICE (C preprocessor / Lisp
+//     macro lineage), not control flow that runs early. Its braces delimit text to
+//     splice, not a block -- so introducing no scope is the sensible behaviour, not
+//     an exception. #if exists to put declarations INTO the surrounding scope.
+//     The discriminating test (a scope model predicts these match; they don't):
+//         #if true  { x := 10; }  with an outer x -> "Error: Redeclaration of 'x'."
+//         #if false { x := 10; }  with an outer x -> compiles clean, nothing spliced
 //   `Vector3.{1, 2, 3}`   -> struct-literal braces echo C; no declaration is legal
 //                            inside one anyway.
 // Data vs imperative scope (how_to/080_scopes.jai): a data scope (file top level, a
