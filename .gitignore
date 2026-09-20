@@ -1,18 +1,23 @@
 # Credentials and secrets
 .credentials.json
+# daemon runtime state; daemon/control.key is a secret
+daemon/
 
 # Transient caches and state
 .last-cleanup
+.last-update-result.json
 cache/
 debug/
 file-history/
 ide/
+jobs/
 paste-cache/
 plans/
 plugins/
 projects/
 session-env/
 shell-snapshots/
+skills/synced/
 statsig/
 tasks/
 todos/
@@ -33,6 +38,10 @@ telemetry/
 # Claude-in-Chrome native messaging host binaries (installed by the
 # extension; machine-specific, not source)
 chrome/
+
+# Installed and overwritten by herdr on every reinstall/update of the
+# integration, so tracking it would churn on each herdr version bump
+hooks/herdr-agent-state.sh
 
 # Build artifacts from Jai compendium (compiled ELF binaries + object files)
 skills/jai-language/compendium/.build/
