@@ -133,6 +133,26 @@ Do NOT assume a shipped example compiles — `examples/module_info.jai` compiles
 warning** at 0.2.030. So the cited examples are part of the release checklist too: re-compile each on
 every version bump (scratch copies; compile-only is enough — they need no run for signature proof).
 
+**A fourth proof source — LIVE-VERIFIED against a real program.** A few claims are about
+what the TOOLCHAIN does, not what the language accepts, so no compendium entry can assert
+them: the corpus proves behaviour with runtime asserts, and "gdb can break here" is not a
+runtime assert. These carry `verified live: beta X | <date>` in the cheatsheet and need a
+re-verification RECIPE instead of a compile, or they rot silently. Recorded so far:
+
+- **Generated code is readable and debuggable** (beta 0.2.030, 2026-09-20). Re-verify:
+  1. Build any project that uses `#insert` with multi-statement expansions, then read
+     `<build-dir>/.added_strings_w<N>.jai` — every expansion and `add_build_string`, each
+     headed with its origin file and line.
+  2. `readelf --debug-dump=rawline <bin> | grep added_strings` — the generated file must
+     appear in the DWARF file table. **A small expansion will NOT appear** (it folds into
+     the `#insert` call site), so use a real one; a toy test reports the wrong answer.
+  3. `gdb -batch -q -ex "directory <build-dir>" -ex "break .added_strings_w<N>.jai:<line>"
+     -ex run --args <bin>` — the breakpoint must resolve AND hit, and `bt` must show a
+     backtrace mixing generated and hand-written frames.
+- **`for_expansion` macros need `-debug_for` to be steppable** (beta 0.2.030, 2026-09-20).
+  Re-verify: break on a `for` over a type with a `for_expansion`, `step`, and confirm it
+  skips the macro body by default and enters it when built with `-debug_for`.
+
 **Still unverified here** (no self-contained example ships): `#cpp_method` /
 `#cpp_return_type_is_non_pod` — only used inside platform module bindings (`modules/d3d11`,
 `modules/Windows`, `modules/Check`), which don't build standalone on this box. Genuinely open.

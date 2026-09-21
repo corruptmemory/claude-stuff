@@ -926,6 +926,23 @@ Source: `modules/Thread/module.jai`
 //   whole expansion as one line. Substantial multi-statement expansions DO get their own
 //   file+line entries. So testing this with a toy tells you the feature does not exist.
 //   Verify with `readelf --debug-dump=rawline <bin> | grep added_strings`.
+//
+// ⚠ EXCEPTION -- for_expansion macros are NOT steppable by default. Measured: with a
+//   breakpoint on the `for` line, `step` jumps straight PAST the macro to the next
+//   statement. `-debug_for` opts in, and then `step` lands inside the for_expansion
+//   body. The compiler's own help says why: stepping through for loops is more
+//   convenient without it. So "generated code is debuggable" is true of #insert and
+//   opt-in for for_expansion.
+//
+// DEBUG-RELATED COMPILER FLAGS (there is NO `-debug` -- debug info is on by default,
+// and `jai x.jai -debug` fails with "Unknown argument '-debug'"):
+//   -debug_for           step INTO for_expansion macros (off by default, see above)
+//   -no_inline           disable inlining program-wide; without it `step` lands inside
+//                        inlined callees (an inlined align4 showed up mid-expansion)
+//   -od/-optimized_debug less optimized, keeps user-level stack traces
+//   -very_debug          more debugging facilities, slower, catches more
+//   -natvis              natvis-compatible type names in debug info (array<T> not [] T)
+//   -debugger            drop into the interactive debugger on a COMPILE-TIME crash
 #insert(break=break outer, continue=continue inner) expr;  // combined break + continue
 #insert(remove={inline remove_fn(arr, `it_index); `it_index -= 1;}) body;  // remove with compound body
 #insert -> Code { return #code x = 1; }  // short form (arrow + block)
