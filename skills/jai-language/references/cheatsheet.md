@@ -115,6 +115,15 @@ name :: (#discard result: int) { }              // discard (caller ignores)
 // Multiple returns
 name :: () -> int, bool { return 42, true; }
 
+// NO multi-value forwarding (beta 0.2.030, compendium/02). A multi-return CALL is ONE
+// value — its first — in a return, in an argument, and in a single-name assignment.
+two :: () -> int, bool { return 7, true; }
+// fwd :: () -> int, bool { return two(); }   // Error: Not enough return values: Wanted 2, got 1.
+//                                            // ... and the "procedure being called" it points at is fwd, not two
+fwd :: () -> int, bool { v, ok := two(); return v, ok; }   // the idiom: name both, return both
+one :: () -> int { return two(); }                 // legal, drops the `ok` silently
+n   := two();                                      // first value only; `a, b := two()` takes both
+
 // Named returns
 name :: () -> result: int, ok: bool { result = 42; ok = true; }
 name :: () -> result: *Entity = null, status := SUCCESS { }  // mixed with :=

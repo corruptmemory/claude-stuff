@@ -60,7 +60,12 @@ sixth went into an EXISTING entry rather than a new one, which the rule prefers:
 `compendium/30_module_parameters/` now also proves that the same module can be imported
 **twice in one scope** with different group-1 arguments, and that the two instantiations'
 types **do not unify** — reported as `incompatible structs (wanted "Box" [module.jai:33],
-given "Box" [module.jai:33])`, an error naming neither cause.
+given "Box" [module.jai:33])`, an error naming neither cause. A **seventh** likewise
+extended an existing entry: `compendium/02_procedures.jai` now proves there is **no
+multi-value forwarding** — a multi-return CALL contributes exactly ONE value (its first)
+in a return, in an argument, and in a single-name assignment, so Go's `return f()`
+pass-through is a compile error here, and the error (`Not enough return values: Wanted 2,
+got 1`) names the CALLER's arity rather than the missing forwarding.
 
 **A worked example of why step 2 says "and RUNS":** `compendium/36`'s first draft
 compiled clean and failed an assert at runtime, because a hand-counted string length was

@@ -5,7 +5,9 @@
 //   how_to/042_using.jai, how_to/060_polymorphism.jai,
 //   how_to/110_polymorphic_arguments.jai, how_to/160_type_restrictions.jai
 // Use-cases: basic procedures, default params, variadic (typed ..int / ..Any),
-//   multiple returns, named returns, inline, using-param, #discard param,
+//   multiple returns (incl. NO multi-value forwarding: a call yields ONE value in a
+//   return, an argument, or a single-name assignment), named returns, inline,
+//   using-param, #discard param,
 //   polymorph $T, $T/interface, $T/.[..] type-set, => lambda,
 //   call-site inline/no_inline, #symmetric/#no_alias/#no_debug/#compile_time,
 //   #expand, #modify, procedure types
@@ -29,6 +31,26 @@ divide :: (a: int, b: int) -> int, bool {
     if b == 0  return 0, false;
     return a / b, true;
 }
+
+// NO MULTI-VALUE FORWARDING (beta 0.2.030). A multi-return CALL contributes exactly ONE
+// value — its first — wherever a single value is expected. There is no `return f();`
+// that passes both of f's results through, the way Go's `return f()` does:
+//
+//     forward :: () -> int, bool { return divide(10, 3); }
+//     // Error: Not enough return values: Wanted 2, got 1.
+//     //   ... Here is the procedure being called.   <- points at `forward`, not `divide`
+//
+// The error names the CALLER's arity, not the missing forwarding, so it reads like a
+// typo in the signature. The idiom is to name both values and return them:
+forward_both :: () -> int, bool {
+    q, ok := divide(10, 3);
+    return q, ok;
+}
+
+// The same one-value rule, seen from the two other positions it shows up in. Neither is
+// an error — the extra returns are simply dropped, silently.
+forward_first :: () -> int { return divide(10, 3); }          // the quotient, no `ok`
+double_first  :: (v: int) -> int { return v * 2; }            // called as double_first(divide(...))
 
 // Named returns (must explicitly return values, no implicit return of named vars)
 safe_divide :: (a: int, b: int) -> result: int, ok: bool {
@@ -117,6 +139,15 @@ main :: () {
 
     q, ok := divide(10, 3);
     print("divide(10,3) = %, ok=%\n", q, ok);
+
+    // No multi-value forwarding: a call is ONE value in a return, in an argument, and
+    // in a single-name assignment; two names take both.
+    fq, fok := forward_both();
+    assert(fq == 3 && fok == true);
+    assert(forward_first() == 3);                 // the `ok` was dropped, not an error
+    assert(double_first(divide(10, 3)) == 6);     // argument position: the quotient only
+    first_only := divide(10, 3);                  // single name: the first value
+    assert(first_only == 3);
 
     r, ok2 := safe_divide(10, 0);
     print("safe_divide(10,0) = %, ok=%\n", r, ok2);
