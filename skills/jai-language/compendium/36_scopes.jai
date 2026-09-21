@@ -52,6 +52,17 @@
 //     declining to scope it is a real semantic, not an artefact of imports needing to
 //     sit at file scope.
 //
+//     AND THE REASON IS DULLER THAN IT LOOKS, which is the useful part: imports have no
+//     scoping behaviour of their own. `Math :: #import "Math";` is just `name :: value`
+//     — the SAME declaration form as a constant, a procedure or a struct — whose value
+//     happens to be a module. Declarations are scoped by `{ }`, so this one is too. No
+//     import-specific rule exists or is needed.
+//
+//     The C analogy is what misleads. A C `#include` is textual substitution and is not
+//     a declaration, so there is nothing there to scope; reading `#import` as its
+//     cousin imports (sorry) an intuition that is wrong at the root while still
+//     producing correct answers at file scope — the worst kind of wrong model.
+//
 //     This is load-bearing in real code. A compile-time backend facade is written
 //     exactly this way, and cannot be written any other way:
 //
