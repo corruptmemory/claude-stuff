@@ -894,6 +894,12 @@ a migration file, a committed schema dump) — same typed precision, reproducibl
 schema shows up in diffs where a reviewer sees it change. The useful question is not "can I run
 this at build time" (you can) but "is this input versioned with the code".
 
+📖 **Read `how_to/999_temperance.jai`** before leaning hard on any of this. It is the language
+author's own notes on restraint — too much code doing too little, over-generalization as the
+source of bloat, tacit knowledge as the thing that decays — and its final line is a TODO reading
+*"A section about not overusing compile-time execution."* The capability documented above is not
+a reason to use it.
+
 ```jai
 #run expr;                              // compile-time execution
 #run { block; }
