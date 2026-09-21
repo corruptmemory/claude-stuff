@@ -861,6 +861,28 @@ Source: `modules/Thread/module.jai`
 **Common pitfall:** A module that uses `Name :: #import "Basic"` but calls bare `assert()` or `free()` in its source files will compile fine if never independently instantiated (e.g., no test suite imports it). The error only surfaces when the module is first compiled as a dependency. Always verify modules compile by adding them to the test build.
 
 ### Compile-Time Execution
+<!-- verified live: beta 0.2.030 | 2026-09-20 -->
+
+**`#run` is the FULL runtime, not a restricted const-evaluator.** Anything the compiler can
+compile is available at build time — including **foreign calls into C**. Measured: a `#run`
+calling libc `getpid()` returned **the compiler's own pid** (14581), which was then baked into
+the binary as a constant, while the finished program's own pid at runtime was different (14619).
+Compile-time code literally executes inside the compiler process.
+
+**A build can therefore be gated on anything.** `compiler_report` from inside a `#run` fails the
+build, so "only finish the build if <arbitrary computation> holds" is an ordinary thing to write:
+
+```jai
+#run { if play() < 100  compiler_report("Build refused: you did not score 100.\n"); }
+```
+Measured both ways — a failing score produced `Error: Build refused: ...` and no binary; a passing
+one built and ran. The extreme demonstration of this is Jonathan Blow's: playing the `invaders`
+game (shipped at `examples/invaders`) during a commercial build, gated on the score. The point is
+not the stunt — it is that windowing, input and rendering are *not special* at compile time.
+
+Practical consequence: a `first.jai`-style metaprogram can run test suites, validate generated
+artifacts, or check invariants as part of the build rather than as separate steps.
+
 ```jai
 #run expr;                              // compile-time execution
 #run { block; }
