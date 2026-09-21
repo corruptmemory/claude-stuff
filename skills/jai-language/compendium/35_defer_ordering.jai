@@ -20,6 +20,17 @@
 //      not once after the loop. (So `defer free(x)` in a loop frees each x, which is
 //      usually what you want, and `defer` accumulating a lock is usually not.)
 //   4. A defer runs on an early `return` as well as on falling off the end.
+//   5. A defer CANNOT amend what the procedure returns. `return x;` snapshots x
+//      BEFORE the defers run, so a defer that mutates that local changes nothing the
+//      caller sees. And unlike Go, there is no named-return variable to assign to: a
+//      return value's NAME is documentation only, not a variable in the body —
+//      `f :: () -> status: int { status = 7; ... }` is
+//          Error: Undeclared identifier 'status'.
+//      (beta 0.2.030; the same error inside a defer). Names + DEFAULTS are still
+//      functional: they let a bare `return;` fill every result in, which rule 5's
+//      `defaults_fill_in` proves below. Go's `defer func(){ err = ... }()` idiom has
+//      no Jai equivalent — a proc that must adjust its status on the way out has to
+//      do it with an explicit statement before each return.
 //
 // THE PRACTICAL RULE that follows from (1):
 //
@@ -77,6 +88,26 @@ early_return :: (bail: bool) {
     mark("fell-through");
 }
 
+// (5) A defer cannot amend the returned value: `return status` is evaluated before
+// the defers run. `bump` mutates the local through a pointer — visible to anything
+// still reading the local, invisible to the caller.
+bump :: (p: *int) { p.* = 99; }
+
+snapshot_before_defers :: () -> int {
+    status := 3;
+    defer bump(*status);
+    return status;      // 3 reaches the caller; the defer's 99 lands after the copy
+}
+
+// ... and the other half of rule 5: a NAMED return value is not a variable, but its
+// DEFAULT is real — a bare `return;` fills in every declared default.
+Status :: enum { SUCCESS; FAIL; }
+
+defaults_fill_in :: (fail: bool) -> code: int = -1, status := Status.SUCCESS {
+    if fail  return 2, .FAIL;
+    return;             // both defaults, no values named
+}
+
 // The acquisition/teardown pairing rule, modelled: `second` depends on `first`, so it
 // must be released first. Registering each release right after its acquisition gets
 // that ordering without anyone having to reason about it.
@@ -115,11 +146,20 @@ main :: () {
     assert(order[1] == "teardown", "and the defer still fired");
     array_reset(*order);
 
+    assert(snapshot_before_defers() == 3, "return snapshots the value BEFORE the defers run");
+
+    c_default, s_default := defaults_fill_in(false);
+    assert(c_default == -1,              "a bare return fills in a named result's default");
+    assert(s_default == Status.SUCCESS,  "and the inferred-type default too");
+    c_named, s_named := defaults_fill_in(true);
+    assert(c_named == 2 && s_named == Status.FAIL, "naming both values still works");
+
     acquire_nested();
     assert(released[2] == "release-second", "the later acquisition is released FIRST");
     assert(released[3] == "release-first",  "and the earlier one LAST -- correct nesting");
 
     print("PASS: defer ordering and scope (LIFO within a scope; block-scoped, not\n");
-    print("  function-scoped; once per loop iteration; fires on early return; and the\n");
-    print("  register-next-to-the-acquisition rule yields correct teardown nesting)\n");
+    print("  function-scoped; once per loop iteration; fires on early return; cannot\n");
+    print("  amend the returned value; and the register-next-to-the-acquisition rule\n");
+    print("  yields correct teardown nesting)\n");
 }

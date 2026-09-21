@@ -75,7 +75,7 @@ a, d:, c = 4, 5, 6;                                 // d: declares new; a,c assi
 ```
 
 ## Procedures
-<!-- compile-verified: beta 0.2.030 | compendium/02, 10, 16, 34 -->
+<!-- compile-verified: beta 0.2.030 | compendium/02, 10, 16, 34, 35 -->
 
 ```jai
 // ── ARGUMENT MUTABILITY: scalars are mutable, aggregates are NOT ────────────────
@@ -124,10 +124,18 @@ fwd :: () -> int, bool { v, ok := two(); return v, ok; }   // the idiom: name bo
 one :: () -> int { return two(); }                 // legal, drops the `ok` silently
 n   := two();                                      // first value only; `a, b := two()` takes both
 
-// Named returns
-name :: () -> result: int, ok: bool { result = 42; ok = true; }
-name :: () -> result: *Entity = null, status := SUCCESS { }  // mixed with :=
+// Named returns — the NAME is documentation; the DEFAULT is functional.
+// (beta 0.2.030, compendium/35. Corrected here: this block previously claimed you
+// assign the names in the body, Go-style. You cannot — they are not variables.)
+// named :: () -> status: int { status = 7; }   // Error: Undeclared identifier 'status'.
+//                                              // ... same error inside a defer
+name :: () -> result: int, ok: bool { return 42, true; }      // return the values, as always
+name :: () -> result: *Entity = null, status := SUCCESS { return; }  // a bare return fills in BOTH defaults
 name :: () -> string, success: bool { }           // mixed named/unnamed
+// Consequence: a defer cannot amend what you return (there is no named-return variable
+// to assign, and `return x;` snapshots x before the defers run). Go's
+// `defer func(){ err = ... }()` has no equivalent — adjust the status explicitly
+// before each return. See Special Syntax > defer ordering and scope.
 name :: () -> (result: int, ok: bool) { }         // parenthesized
 
 // NOTE: #must does NOT exist in beta 0.2.028
@@ -789,6 +797,12 @@ for 0..size-1 #no_abc #no_aoc {        // no array bounds check, no arithmetic o
 //    at that block's exit, not at function exit.
 // 3. A defer in a loop body runs once PER ITERATION, at the end of that iteration.
 // 4. A defer fires on an early `return` as well as on falling off the end.
+// 5. A defer CANNOT amend what the procedure returns. `return x;` snapshots x BEFORE
+//    the defers run, so a defer that mutates that local changes nothing the caller
+//    sees -- and there is no named-return variable to assign either (see Procedures >
+//    Named returns: the name is documentation, not a variable). Go's
+//    `defer func(){ err = ... }()` idiom has NO Jai equivalent; a proc that must fix
+//    up its status does it with a statement before each return.
 // PRACTICAL RULE: register each teardown IMMEDIATELY AFTER the acquisition it undoes,
 // and nesting comes out right for free (B acquired after A is torn down before A).
 // The bug is registering teardowns out of order relative to their acquisitions --
@@ -1711,6 +1725,30 @@ visit_files("dir", true, *counter, (info: *File_Visit_Info, ctx: *My_Ctx) {
     if ends_with(info.full_name, ".xml")  ctx.count += 1;
 });
 // Source: modules/File_Utilities/module.jai
+```
+
+### POSIX Process Control (`#import "POSIX"`)
+<!-- compile-verified: beta 0.2.030 | compendium/39_fork_and_exit.jai -->
+```jai
+// modules/POSIX/bindings/linux/base.jai — ordinary #foreign libc bindings, so the C
+// semantics are the semantics. (Bindings are per-OS: these signatures are the Linux
+// ones; macOS declares fork/_exit/waitpid too.)
+fork    :: () -> s32               #foreign libc;   // 0 in the CHILD, the child's pid in the PARENT, -1 on failure
+_exit   :: (status: s32) -> void   #foreign libc;   // leave WITHOUT atexit handlers or any flushing
+waitpid :: (pid: s32, stat_loc: *s32, options: s32) -> s32 #foreign libc;
+pipe2   :: (pipedes: *[2] s32, flags: s32) -> s32  #foreign libc;   // NOTE: *[2] s32, not *s32
+exit_code := (status >> 8) & 0xFF;                  // waitpid's encoded status
+
+// BACKGROUNDING ("fork, parent leaves, child keeps serving"):
+pid := POSIX.fork();
+if pid > 0  POSIX._exit(0);        // PARENT: nothing buffered to lose (see below)
+// ... the child carries on, owning every fd and every byte of the pre-fork heap.
+
+// **print / log are UNBUFFERED on Unix** — Runtime_Support's write_string_unsynchronized
+// loops on a raw write(2) to fd 1; there is no stdio buffer in the path. So, unlike C,
+// output printed before a fork can be neither LOST by a parent that `_exit`s nor
+// DUPLICATED by the child. (Anything YOU buffer -- a String_Builder, your own file
+// handle -- is still yours to flush before forking.)
 ```
 
 ### String Formatting (`#import "Basic"`)

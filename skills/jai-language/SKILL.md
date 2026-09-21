@@ -14,7 +14,7 @@ The Jai compiler distribution at `~/jai/jai/` contains the authoritative source:
 
 See [references/cheatsheet.md](references/cheatsheet.md) for the full language cheat sheet.
 See [compendium/](compendium/) for compilable code samples demonstrating every language feature
-(38 entries: 36 single `.jai` files + two subdirectory entries, `30_module_parameters/` and
+(39 entries: 37 single `.jai` files + two subdirectory entries, `30_module_parameters/` and
 `38_arithmetic_overflow_check/`).
 See [references/build-variables-recipe.md](references/build-variables-recipe.md) for the canonical
 metaprogram recipe for custom compile-time build variables (`#placeholder` knobs module +
@@ -60,7 +60,17 @@ sixth went into an EXISTING entry rather than a new one, which the rule prefers:
 `compendium/30_module_parameters/` now also proves that the same module can be imported
 **twice in one scope** with different group-1 arguments, and that the two instantiations'
 types **do not unify** — reported as `incompatible structs (wanted "Box" [module.jai:33],
-given "Box" [module.jai:33])`, an error naming neither cause. A **seventh** likewise
+given "Box" [module.jai:33])`, an error naming neither cause. A **ninth** and a **tenth** landed on 2026-09-20, from
+building a program that forks: `compendium/39_fork_and_exit.jai` (POSIX `fork`/`_exit`/
+`waitpid` from Jai, copy-on-write across the fork, and — the part that makes forking safe —
+**`print`/`log` are an UNBUFFERED `write(2)` on Unix**, so pre-fork output can be neither
+lost by a parent that `_exit`s nor duplicated by the child, unlike C's buffered stdout);
+and an extension of `compendium/35_defer_ordering.jai` that CORRECTED the cheatsheet — its
+"Named returns" example claimed you assign the result names in the body, Go-style, and you
+cannot: a return value's name is **documentation, not a variable** (`Error: Undeclared
+identifier 'status'`), so a **defer cannot amend what a procedure returns** (`return x;`
+snapshots x before the defers run). The names' DEFAULTS are functional, though: a bare
+`return;` fills every one in. A **seventh** likewise
 extended an existing entry: `compendium/02_procedures.jai` now proves there is **no
 multi-value forwarding** — a multi-return CALL contributes exactly ONE value (its first)
 in a return, in an argument, and in a single-name assignment, so Go's `return f()`
