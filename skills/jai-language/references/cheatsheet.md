@@ -943,6 +943,31 @@ Source: `modules/Thread/module.jai`
 //   -very_debug          more debugging facilities, slower, catches more
 //   -natvis              natvis-compatible type names in debug info (array<T> not [] T)
 //   -debugger            drop into the interactive debugger on a COMPILE-TIME crash
+
+// ── BUILD-TIME PLUGINS: `+Name`, not `-flag` (beta 0.2.030; verified live 2026-09-20) ─
+// A plugin is a MODULE the compiler loads into the build to observe and rewrite the
+// program as it compiles. Invocation is a `+` argument, placed AFTER the ordinary
+// options and BEFORE the lone `-` that separates compiler args from program args:
+//     jai -x64 program.jai -verbose +Icon -icon icon.ico +Autorun
+// A plugin module exports `get_plugin`; `modules/Example_Plugin.jai` is the template and
+// `modules/Metaprogram_Plugins.jai` is the framework. (A project driving its own build
+// through a first.jai metaprogram, as screen-killer does, is the same machinery by hand.)
+//
+// Shipping in the distribution: Check (see below), Iprof (instrumented profiler),
+// Performance_Report, Program_Print, Codex, Autorun, Icon, Rewrite. The heavy ones --
+// call graphs, memory debugging, profiling -- are what a GAME-sized program leans on; a
+// CLI generally needs none of them.
+//
+// ⚠ `modules/Check` RUNS BY DEFAULT, and it is not cosmetic. Measured:
+//     print("% and %\n", 1);          // two placeholders, one argument
+//   default build -> COMPILE ERROR:
+//     Error: Incorrect number of arguments supplied to 'print': The format string
+//     requires 2 arguments, but 1 argument is given.
+//   built with -no_check -> compiles, then fails at RUNTIME:
+//     Invalid % index 2 in the format string "% and %" at character 7.
+//   So format-string arity is a COMPILE-time guarantee unless you turn it off.
+//   `-no_check` disables it (documented as: for your own checking plugin, or for speed
+//   in builds known good); `-no_check_bindings` disables only its module-binding checks.
 #insert(break=break outer, continue=continue inner) expr;  // combined break + continue
 #insert(remove={inline remove_fn(arr, `it_index); `it_index -= 1;}) body;  // remove with compound body
 #insert -> Code { return #code x = 1; }  // short form (arrow + block)

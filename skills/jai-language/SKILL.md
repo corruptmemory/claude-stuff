@@ -149,6 +149,9 @@ re-verification RECIPE instead of a compile, or they rot silently. Recorded so f
   3. `gdb -batch -q -ex "directory <build-dir>" -ex "break .added_strings_w<N>.jai:<line>"
      -ex run --args <bin>` — the breakpoint must resolve AND hit, and `bt` must show a
      backtrace mixing generated and hand-written frames.
+- **`modules/Check` is a default-on plugin** (beta 0.2.030, 2026-09-20). Re-verify:
+  compile `print("% and %\n", 1);` — it must be a COMPILE error naming the arity; the
+  same file with `-no_check` must compile and fail at runtime instead.
 - **`for_expansion` macros need `-debug_for` to be steppable** (beta 0.2.030, 2026-09-20).
   Re-verify: break on a `for` over a type with a `for_expansion`, `step`, and confirm it
   skips the macro body by default and enters it when built with `-debug_for`.
