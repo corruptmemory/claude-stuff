@@ -65,7 +65,14 @@ extended an existing entry: `compendium/02_procedures.jai` now proves there is *
 multi-value forwarding** — a multi-return CALL contributes exactly ONE value (its first)
 in a return, in an argument, and in a single-name assignment, so Go's `return f()`
 pass-through is a compile error here, and the error (`Not enough return values: Wanted 2,
-got 1`) names the CALLER's arity rather than the missing forwarding.
+got 1`) names the CALLER's arity rather than the missing forwarding. An **eighth**, also
+into an existing entry: `compendium/28_foreign_and_asm.jai` now proves that a `#foreign`
+declaration ending in `..Any` marshals those values as real **C VARARGS** — the cheatsheet
+documented `..Any` only for ordinary Jai procedures, so the distribution's own
+`fcntl :: (fd: s32, cmd: s32, args: ..Any) -> s32 #foreign libc` looked like a binding that
+might not actually be callable. It is: `fcntl(fd, F_SETFL, fl | O_NONBLOCK)` is read back by
+`F_GETFL` **and** changes what the kernel does (a full pipe answers EAGAIN instead of
+blocking), so the third argument demonstrably crosses the boundary.
 
 **A worked example of why step 2 says "and RUNS":** `compendium/36`'s first draft
 compiled clean and failed an assert at runtime, because a hand-counted string length was

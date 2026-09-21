@@ -177,6 +177,14 @@ c_malloc :: (size: u64) -> *void #foreign crt "malloc"; // with custom link name
 walloc_malloc :: (size: s64) -> *void #foreign "malloc"; // foreign with string name only (WASM)
 // Source: modules/Default_Allocator/module.jai, examples/wasm/modules/Walloc.jai
 
+// C VARARGS: a #foreign proc may end in `..Any`, and those values marshal as real
+// C varargs. Verified beta 0.2.030 (compendium/28): fcntl(fd, F_SETFL, fl|O_NONBLOCK)
+// actually sets the flag — F_GETFL reads it back AND the kernel then returns EAGAIN on
+// a full pipe instead of blocking. So `..Any` is not Jai-only; it is how the
+// distribution binds fcntl/ioctl/open and the printf family.
+fcntl :: (fd: s32, cmd: s32, args: ..Any) -> s32 #foreign libc;
+// Source: modules/POSIX/bindings/linux/stdio.jai:1051 (fcntl), :1053 (fcntl64)
+
 // Internal-only modifiers (used by compiler/runtime, not user code)
 // #entry_point — marks program entry point (1 use: modules/Runtime_Support.jai:441)
 //   __program_main :: () #entry_point;  // declares the program's main entry point
