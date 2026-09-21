@@ -1243,6 +1243,20 @@ my_macro2 :: (row: *$T, override_code: Code = #code .[]) #expand {
 ```
 
 - **Group 1 — per-import (module) parameters.** Each `#import` may pass different values; each *distinct argument list* compiles a SEPARATE copy of the module (separate procs, separate global storage). Re-importing with an identical list deduplicates to one instance. Dedup matches on the **textual argument list**, so `(A=1,B=2)` and `(B=2,A=1)` do NOT dedup even though equivalent (how_to/380 lines 98–137).
+  - **You can bind two (or more) instances IN THE SAME SCOPE** — `Name :: #import "M"(args)` is an ordinary constant declaration whose value is a module *instance*, so nothing stops you having several. A parameterized module is therefore instantiable in the ML-functor sense:
+    ```jai
+    Two   :: #import "param_module"(SCALE=2);
+    Three :: #import "param_module"(SCALE=3);
+    assert(Two.get_scale() == 2  &&  Three.get_scale() == 3);   // both live at once
+    ```
+    Group 2 cannot vary this way (it is program-wide); a named import that omits it **inherits** whatever the main program set.
+  - **⚠ Types from two instantiations DO NOT UNIFY, and the error names neither cause.** `Two.Box` and `Three.Box` are distinct types printed with the SAME name and the SAME source location:
+    ```
+    Error: Type mismatch: incompatible structs
+      (wanted "Box" [param_module/module.jai:33], given "Box" [param_module/module.jai:33]).
+    ... in binary operator = (left type: Box; right type: Box).
+    ```
+    Nothing on screen distinguishes them, because what distinguishes them is which *instantiation* they came from. `Two.Box != Three.Box` is `true` at compile time. The same surprise arrives by a second route: a module imported by two different **literal path strings** is two instances, so `../modules/X` and `../../modules/X` also produce non-unifying types — import a shared module by ONE spelling everywhere, or put the shared types in a separately-named module.
 - **Group 2 — program parameters.** GLOBAL to the whole program: ONE value shared by every import of that module. Rules (how_to/380 lines 179–181):
   - **Only the MAIN PROGRAM may supply them — never a library/imported module.** A module that tries (e.g. `#import "core"()(Param = X)` inside a library) fails to compile: *"This #import provides program parameters, but is not located in the main program. Program parameters can only be supplied from the main program."* (verified beta 0.2.029). A library imports the core **bare** and inherits whatever the main set.
   - Supplied **exactly once**, by that main-program import, which **must precede every other import of the same module** (else "too late to set them" → compile error).

@@ -28,3 +28,8 @@ get_scale :: () -> int {
 
 #scope_module
 #import "Basic";
+
+// A TYPE, so a consumer can ask whether two instantiations' types unify. They do not:
+// each distinct group-1 argument list yields a SEPARATE COPY of the module, types
+// included. See driver.jai's "TWICE IN ONE SCOPE" section.
+Box :: struct { v: int; }

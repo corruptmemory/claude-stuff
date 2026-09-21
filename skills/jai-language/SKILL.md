@@ -51,7 +51,12 @@ scalars are assignable, aggregates are not, and `x := x` is rejected), `compendi
 (defer ordering and scope), `compendium/36` (scopes — a bare `{ }` is a real scope;
 `#if` and struct-literal braces are not, **including for imports**, which a bare block
 DOES scope while a `#if` splices them into the enclosing scope), and `compendium/37`
-(array-to-slice conversion — a `*[..]T` satisfies a `*[]T` parameter, a `*[N]T` does not).
+(array-to-slice conversion — a `*[..]T` satisfies a `*[]T` parameter, a `*[N]T` does not). A
+fifth went into an EXISTING entry rather than a new one, which the rule prefers:
+`compendium/30_module_parameters/` now also proves that the same module can be imported
+**twice in one scope** with different group-1 arguments, and that the two instantiations'
+types **do not unify** — reported as `incompatible structs (wanted "Box" [module.jai:33],
+given "Box" [module.jai:33])`, an error naming neither cause.
 
 **A worked example of why step 2 says "and RUNS":** `compendium/36`'s first draft
 compiled clean and failed an assert at runtime, because a hand-counted string length was
