@@ -143,7 +143,7 @@ name :: () #deprecated { }                        // deprecated warning
 name :: () #deprecated "use new()" #foreign lib;  // deprecated with message
 name :: () #compiler { }                          // compiler plugin
 name :: () #compile_time { }                      // compile-time only
-name :: () #no_aoc { }                            // no automatic output capture
+name :: () #no_aoc { }                            // no ARITHMETIC OVERFLOW CHECK (beta 0.2.030; compendium/38)
 name :: () #cpp_method #foreign lib;              // C++ calling convention
 name :: () #cpp_return_type_is_non_pod #foreign l; // C++ non-POD return
 name :: () #no_alias { }                          // no pointer aliasing
@@ -651,11 +651,11 @@ my_macro :: () #expand {
 ```
 
 ### Loop-Body Directives
-<!-- compile-verified: beta 0.2.030 | compendium/13 -->
+<!-- compile-verified: beta 0.2.030 | compendium/13, 38 -->
 ```jai
 // #no_abc and #no_aoc can appear BETWEEN iterable and body in for loops
 // Source: modules/Hash.jai
-for 0..size-1 #no_abc #no_aoc {        // no array bounds check, no auto output capture
+for 0..size-1 #no_abc #no_aoc {        // no array bounds check, no arithmetic overflow check
     h = (h << 5) + h + data[it];
 }
 // For-loop modifier order is flexible: `for < *` and `for <*` are both valid
@@ -663,7 +663,7 @@ for 0..size-1 #no_abc #no_aoc {        // no array bounds check, no auto output 
 ```
 
 ### Standalone #no_aoc / #no_abc Block Statements
-<!-- compile-verified: beta 0.2.030 | compendium/16, 35, 36 -->
+<!-- compile-verified: beta 0.2.030 | compendium/16, 35, 36, 38 -->
 ```jai
 // #no_aoc can wrap an arbitrary block of statements (NOT just for-loops)
 // This disables arithmetic overflow checking for the enclosed operations
@@ -683,6 +683,49 @@ for 0..size-1 #no_abc #no_aoc {        // no array bounds check, no auto output 
 // Note: only #no_aoc { } standalone blocks observed in distribution
 // No standalone #no_abc { } blocks found (only as procedure/loop modifier)
 // Source: modules/Basic/Int128.jai (~5 occurrences), modules/Basic/float_to_string.jai (~1)
+```
+
+#### What #no_aoc suppresses, and when there is anything to suppress
+<!-- compile-verified: beta 0.2.030 | compendium/38 -->
+```jai
+// AOC = Arithmetic Overflow Check. NOT "automatic output capture" -- this
+// cheatsheet said that in two places until beta 0.2.030 and it sent a search the
+// wrong way entirely. Three forms, all equivalent in effect:
+//   proc directive:      f :: (x: u32) -> u32 #no_aoc { return x * 1664525; }
+//   for-loop modifier:   for 0..n-1 #no_abc #no_aoc { h = (h << 5) + h + data[it]; }
+//   standalone block:    #no_aoc { c.low = a.low + b.low; }
+
+// (1) THE CHECK IS OFF BY DEFAULT. Build_Options.arithmetic_overflow_check is
+//     `enum u8 { OFF; NONFATAL; FATAL; } = .OFF` (modules/Compiler/Compiler.jai:124),
+//     and set_optimization never raises it -- the .VERY_DEBUG line at 1755 is
+//     COMMENTED OUT and 1760 forces .OFF. There is no command-line flag for it
+//     (`jai -help` mentions neither "overflow" nor "aoc"). So `jai program.jai`
+//     wraps silently, and #no_aoc is a no-op you cannot test. A metaprogram has to
+//     ask for it:
+//         opts := get_build_options(w);
+//         opts.arithmetic_overflow_check = .FATAL;
+//         set_build_options(opts, w);
+
+// (2) WHEN ON, IT FIRES ON UNSIGNED WRAPAROUND TOO. This is the trap for anyone
+//     arriving from C, where unsigned wraparound is defined and idiomatic. A
+//     textbook u32 LCG panics:
+//         seed = seed * 1664525 + 1013904223;   // u32
+//     Arithmetic overflow. We tried to compute:
+//         305419896 * 1664525
+//     The operand type is u32, but the result does not fit into this type.
+//     Panic.                                     // exit code 1
+//     Hence modules/Hash.jai marking every hash #no_aoc, and Basic/Int128.jai
+//     every limb add.
+
+// (3) IT DOES NOT COVER CHECKED CASTS. `cast(u8) 300` still traps inside a
+//     #no_aoc block; casts have their own opt-outs, `cast,trunc` and
+//     `cast,no_check` (see the Cast section).
+
+// (4) THE ALTERNATIVE TO SUPPRESSING IT is arithmetic that cannot overflow --
+//     carry the value in a wider type and fold it back:
+//         seed = (seed * 1103515245 + 12345) % 0x8000_0000;   // u64, product < 2^61
+//     Prefer this where speed does not matter: #no_aoc turns the check off for
+//     EVERYTHING in its scope, including the overflow you did not intend.
 ```
 
 ### Other

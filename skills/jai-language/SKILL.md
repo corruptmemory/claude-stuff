@@ -14,7 +14,8 @@ The Jai compiler distribution at `~/jai/jai/` contains the authoritative source:
 
 See [references/cheatsheet.md](references/cheatsheet.md) for the full language cheat sheet.
 See [compendium/](compendium/) for compilable code samples demonstrating every language feature
-(37 entries: 36 single `.jai` files + the `30_module_parameters/` subdirectory entry).
+(38 entries: 36 single `.jai` files + two subdirectory entries, `30_module_parameters/` and
+`38_arithmetic_overflow_check/`).
 See [references/build-variables-recipe.md](references/build-variables-recipe.md) for the canonical
 metaprogram recipe for custom compile-time build variables (`#placeholder` knobs module +
 `Message_Import`-scoped `add_build_string`) — including the beta 0.2.029 gated-`#load` bug the
@@ -51,8 +52,11 @@ scalars are assignable, aggregates are not, and `x := x` is rejected), `compendi
 (defer ordering and scope), `compendium/36` (scopes — a bare `{ }` is a real scope;
 `#if` and struct-literal braces are not, **including for imports**, which a bare block
 DOES scope while a `#if` splices them into the enclosing scope), and `compendium/37`
-(array-to-slice conversion — a `*[..]T` satisfies a `*[]T` parameter, a `*[N]T` does not). A
-fifth went into an EXISTING entry rather than a new one, which the rule prefers:
+(array-to-slice conversion — a `*[..]T` satisfies a `*[]T` parameter, a `*[N]T` does not), and
+`compendium/38_arithmetic_overflow_check/` (`#no_aoc` = no ARITHMETIC OVERFLOW CHECK — this
+cheatsheet had glossed it "no automatic output capture" in two places; the check is `.OFF` by
+default in `Build_Options` and fires on UNSIGNED wraparound once turned on). A
+sixth went into an EXISTING entry rather than a new one, which the rule prefers:
 `compendium/30_module_parameters/` now also proves that the same module can be imported
 **twice in one scope** with different group-1 arguments, and that the two instantiations'
 types **do not unify** — reported as `incompatible structs (wanted "Box" [module.jai:33],
@@ -75,10 +79,15 @@ Every compendium `.jai` file **must compile without errors or warnings** against
 4. Clean up build artifacts (`rm -rf .build` in the compendium directory; remove the built
    binaries — they are gitignored but should not linger).
 
-**Subdirectory entry:** `30_module_parameters/` is not a single file — compile its driver with an
-import dir:
-`~/jai/jai/bin/jai-linux compendium/30_module_parameters/driver.jai -import_dir compendium/30_module_parameters`.
-(Every other entry is a single `[0-9]*.jai` file compiled directly.)
+**Subdirectory entries** (two; every other entry is a single `[0-9]*.jai` file compiled directly):
+- `30_module_parameters/` — compile its driver with an import dir:
+  `~/jai/jai/bin/jai-linux compendium/30_module_parameters/driver.jai -import_dir compendium/30_module_parameters`.
+- `38_arithmetic_overflow_check/` — carries its own metaprogram, because what it proves is
+  INVISIBLE under the default build (`Build_Options.arithmetic_overflow_check` defaults to
+  `.OFF`, and there is no command-line flag for it). Build with
+  `~/jai/jai/bin/jai-linux compendium/38_arithmetic_overflow_check/build.jai`, then run the
+  `no_aoc_proof` binary it drops beside `build.jai`. Do NOT compile `program.jai` directly:
+  it would pass while proving nothing.
 
 Do not mark a version as verified until compilation is confirmed. The compendium is a "known good" corpus — if it doesn't compile, the version stamp is a lie.
 
