@@ -897,6 +897,35 @@ Source: `modules/Thread/module.jai`
 #insert(continue=continue outer) expr; // with continue parameter mapping
 #insert(remove=#assert(false)) expr;   // with remove parameter
 #insert(break=break slot, remove={stmt; stmt;}) expr;  // combined break + remove
+
+// ── GENERATED CODE IS DEBUGGABLE, not text (beta 0.2.030; verified live 2026-09-20) ──
+// This is the whole difference from a C macro, and it is worth knowing before you reach
+// for metaprogramming: C's preprocessor DISCARDS its input, so the compiler proper never
+// knows a macro existed and DWARF has nothing to point at. Jai PARSES and TYPE-CHECKS
+// generated code, so it has a location and a debugger can address it.
+//
+// 1. EVERY expansion is written to a real file you can read:
+//        <build-dir>/.added_strings_w<workspace>.jai
+//    with a header per entry naming its origin, e.g.
+//        // #insert text. Generated from .../modules/wayland/marshal.jai:12.
+//        // String added via add_build_string_scoped_by_message() from .../first.jai:357.
+//    Read it to see what the metaprogram ACTUALLY produced. This is the first place to
+//    look when generated code misbehaves.
+//
+// 2. gdb breaks on it BY GENERATED FILE AND LINE, and backtraces mix the two worlds:
+//        (gdb) directory <build-dir>
+//        (gdb) break .added_strings_w3.jai:374
+//        Breakpoint 2 at 0x36ff3a: file .../.added_strings_w3.jai, line 374.
+//        #0  xdg_toplevel_set_title (...) at .../.added_strings_w3.jai:374   <- GENERATED
+//        #1  wl_create_window (...)       at .../Wayland_Support/module.jai:1141  <- source
+//    `next` steps from the generated file back into ordinary module source.
+//
+// ⚠ CAVEAT that makes a cheap test LIE: a SMALL expansion folds into the #insert call
+//   site and gets NO generated-file line entry at all. A 2-statement #insert produced a
+//   binary whose DWARF file table listed only the calling .jai -- gdb stepped over the
+//   whole expansion as one line. Substantial multi-statement expansions DO get their own
+//   file+line entries. So testing this with a toy tells you the feature does not exist.
+//   Verify with `readelf --debug-dump=rawline <bin> | grep added_strings`.
 #insert(break=break outer, continue=continue inner) expr;  // combined break + continue
 #insert(remove={inline remove_fn(arr, `it_index); `it_index -= 1;}) body;  // remove with compound body
 #insert -> Code { return #code x = 1; }  // short form (arrow + block)
