@@ -1823,10 +1823,28 @@ fill(*rows ,, temp);        // the ARRAY *and* every row's STRING are in temp
 (Basic/module.jai): `data` is null and the proc reads `context.temporary_storage` at ALLOCATION
 time, so the same `temp` symbol resolves to whichever arena is current. A callee writing
 `x.allocator = temp` therefore does NOT sever its caller's chain — it fixes the tier and
-inherits the arena. **The thing to hunt for is an allocator with non-null `data`**, because that
-carries an identity the caller did not choose (a file-scope pool, a hard-coded `Flat_Pool`).
+inherits the arena.
+
+**The test is PROVENANCE, not shape: is the allocator reachable from `context`?** Null `data`
+is NOT the criterion. Three forms, and only the last is a mistake:
+
+```jai
+foo(... ,, temp);                                        // in-chain: tier named, arena inherited
+foo(... ,, allocator = game_arena(context.game_context)); // in-chain SPLICE: non-null data,
+                                                          // but the identity came from context
+foo(... ,, allocator = my_file_scope_pool);               // SEVERED: an identity the caller
+                                                          // never chose, invisible at the call site
+```
 Pushing a context derived from the one you were GIVEN is coherent stacking and composes
-arbitrarily deep; reaching past your caller to something fixed is the actual mistake.
+arbitrarily deep; reaching past your caller to something FIXED is the actual mistake. The
+middle form — a single call site selecting a named allocator off context-threaded state — is
+point-wise rather than scope-wide, deliberately uncommon, and more explicit than relying on the
+ambient context. Reach for it when a particular allocation's home is known regardless of where
+the surrounding code is running.
+
+**Context is DYNAMIC, not lexical.** A pushed context extends through every call made while it
+is live, including procedures declared far away. A proc that reads like top-level code can be
+running under a frame arena because of who called it.
 
 **API consequence, and it is the big one:** this is why an OUT-PARAMETER beats returning a
 slice into callee-owned storage for anything carrying heap fields. `f(*out)` lets the CALLER
