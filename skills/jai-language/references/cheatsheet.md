@@ -883,6 +883,17 @@ not the stunt — it is that windowing, input and rendering are *not special* at
 Practical consequence: a `first.jai`-style metaprogram can run test suites, validate generated
 artifacts, or check invariants as part of the build rather than as separate steps.
 
+⚠ **The constraint that should shape what you do with it: keep the build HERMETIC.** Because
+`#run` can reach the network, it is easy to write a build that introspects a live database (or
+an API) and emits precisely-typed code from the real schema — Rails-style codegen, but compiled
+and typesafe. It works, and it is usually the wrong trade: the binary then depends on a service
+being reachable and in a particular state, so two builds of one commit can differ, offline builds
+and `git bisect` break, the build host needs credentials, and a service outage surfaces as a
+*compiler error*. Generate from a **checked-in schema artifact** instead (a pinned protocol XML,
+a migration file, a committed schema dump) — same typed precision, reproducible build, and the
+schema shows up in diffs where a reviewer sees it change. The useful question is not "can I run
+this at build time" (you can) but "is this input versioned with the code".
+
 ```jai
 #run expr;                              // compile-time execution
 #run { block; }
