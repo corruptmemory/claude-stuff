@@ -1783,7 +1783,7 @@ tprint("%", FormatFloat.{value = 3.14, trailing_width = 2});  // "3.14" (struct-
 ```
 
 ## Context System
-<!-- compile-verified: beta 0.2.030 | compendium/16, 21, 29 -->
+<!-- compile-verified: beta 0.2.030 | compendium/16, 21, 29, 40 -->
 
 Every Jai procedure receives an implicit `context` parameter containing:
 - Allocator (default and temporary)
@@ -1797,6 +1797,53 @@ push_context new_ctx {                 // switch context for scope
 }
 context.allocator = my_allocator;      // modify directly
 ```
+
+### The context's TYPE is `#Context`, and it needs a NAMED return
+```jai
+// There is no bare `Context` identifier:
+//   f :: () -> Context  { ... }   // Error: Undeclared identifier 'Context'.
+//   f :: () -> #Context { ... }   // Error: Expected a declaration after ->.
+f :: () -> c: #Context { ctx := context; return ctx; }   // OK -- the return must be NAMED
+x: #Context;                                             // fine as a VARIABLE type
+```
+`push_context` restores correctly on an early `return` out of its block, like a `defer`.
+
+### `,,` is TRANSITIVE — it sets the allocator for the whole DYNAMIC EXTENT
+<!-- compile-verified: beta 0.2.030 | compendium/40 -->
+```jai
+// A callee that array_adds AND copy_strings one level deeper, naming no allocator
+// anywhere, puts BOTH in temporary storage:
+fill :: (out: *[..] Row) { for .. { r.name = copy_string(n); array_add(out, r); } }
+
+rows: [..] Row;
+fill(*rows ,, temp);        // the ARRAY *and* every row's STRING are in temp
+// `,, temp` and `,, allocator = temp` are identical.
+```
+**API consequence, and it is the big one:** this is why an OUT-PARAMETER beats returning a
+slice into callee-owned storage for anything carrying heap fields. `f(*out)` lets the CALLER
+pick the lifetime of the array *and* of every string hanging off it, with no allocator
+parameter threaded through any signature. A returned `[] T` into callee storage is the C
+shape: the ownership rule ends up in a comment, and a comment cannot fail a build.
+
+### Two temporary arenas (different lifetimes in one program)
+```jai
+arena_backing: [1 << 16] u8;
+arena:         Temporary_Storage_Paged_Alloc;   // the DERIVED type, not bare Temporary_Storage
+arena.data = arena_backing.data;                // the allocator proc reads the
+arena.size = arena_backing.count;               // #overlay(implementation_data) fields
+
+ctx := context;
+ctx.temporary_storage = *arena.base;            // #as using base: Temporary_Storage
+push_context ctx {
+    reset_temporary_storage();                  // resets THIS arena, not the outer one
+}
+```
+A zeroed `overflow_allocator` is legal — it falls back to `default_allocator`
+(`Basic/Temporary_Storage_Paged_Alloc.jai:220`), which is what the runtime's own default
+temp storage does. **Measurement trap:** `high_water_mark` is ZEROED by
+`reset_temporary_storage` (same file, :167), so sampling it after a loop reports 0 and a
+control built on it reads as "the feature does nothing". Sample `total_bytes_occupied`
+mid-frame instead.
 
 ### Context handoff across thread / non-Jai boundaries
 

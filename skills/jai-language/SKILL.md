@@ -14,7 +14,7 @@ The Jai compiler distribution at `~/jai/jai/` contains the authoritative source:
 
 See [references/cheatsheet.md](references/cheatsheet.md) for the full language cheat sheet.
 See [compendium/](compendium/) for compilable code samples demonstrating every language feature
-(39 entries: 37 single `.jai` files + two subdirectory entries, `30_module_parameters/` and
+(40 entries: 38 single `.jai` files + two subdirectory entries, `30_module_parameters/` and
 `38_arithmetic_overflow_check/`).
 See [references/build-variables-recipe.md](references/build-variables-recipe.md) for the canonical
 metaprogram recipe for custom compile-time build variables (`#placeholder` knobs module +
@@ -83,6 +83,21 @@ documented `..Any` only for ordinary Jai procedures, so the distribution's own
 might not actually be callable. It is: `fcntl(fd, F_SETFL, fl | O_NONBLOCK)` is read back by
 `F_GETFL` **and** changes what the kernel does (a full pipe answers EAGAIN instead of
 blocking), so the third argument demonstrably crosses the boundary.
+
+An **eleventh** landed 2026-09-22, from an API-design review: `compendium/40_context_and_arenas.jai`
+proves that **`,,` is TRANSITIVE** — it sets `context.allocator` for the whole DYNAMIC EXTENT of a
+call, so a `copy_string` several frames deeper inherits it without any signature naming an
+allocator. That is the mechanic that makes an OUT-PARAMETER the right Jai shape for any API
+handing back a struct with heap fields (the caller picks the lifetime of the array *and* of every
+string on it), where a returned slice into callee-owned storage is the C shape whose ownership
+rule can only live in a comment. The same entry records four things the cheatsheet was silent on:
+the context's TYPE is spelled **`#Context`** (no bare `Context` identifier) and a bare
+`-> #Context` is REJECTED (`Expected a declaration after ->`) so it needs a **named** return;
+`push_context` restores on an early `return`; `context.temporary_storage` can be SWAPPED, so one
+program can run two temp arenas with different lifetimes and `reset_temporary_storage()` resets
+whichever the current context points at; and — the trap that cost a wasted control —
+**`high_water_mark` is ZEROED by `reset_temporary_storage`**, so sampling it after a loop reports
+0 and reads as "the feature does nothing".
 
 **A worked example of why step 2 says "and RUNS":** `compendium/36`'s first draft
 compiled clean and failed an assert at runtime, because a hand-counted string length was
