@@ -1819,6 +1819,15 @@ rows: [..] Row;
 fill(*rows ,, temp);        // the ARRAY *and* every row's STRING are in temp
 // `,, temp` and `,, allocator = temp` are identical.
 ```
+**`temp` is LATE-BOUND — it names a TIER, not an arena.** `temp :: Allocator.{temporary_allocator_proc, null}`
+(Basic/module.jai): `data` is null and the proc reads `context.temporary_storage` at ALLOCATION
+time, so the same `temp` symbol resolves to whichever arena is current. A callee writing
+`x.allocator = temp` therefore does NOT sever its caller's chain — it fixes the tier and
+inherits the arena. **The thing to hunt for is an allocator with non-null `data`**, because that
+carries an identity the caller did not choose (a file-scope pool, a hard-coded `Flat_Pool`).
+Pushing a context derived from the one you were GIVEN is coherent stacking and composes
+arbitrarily deep; reaching past your caller to something fixed is the actual mistake.
+
 **API consequence, and it is the big one:** this is why an OUT-PARAMETER beats returning a
 slice into callee-owned storage for anything carrying heap fields. `f(*out)` lets the CALLER
 pick the lifetime of the array *and* of every string hanging off it, with no allocator

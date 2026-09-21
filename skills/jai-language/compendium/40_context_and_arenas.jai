@@ -82,13 +82,13 @@ main :: () {
     assert(occupied() - before == d_named, "`,, temp` == `,, allocator = temp`");
 
     // ---- 3. TRANSITIVITY: the copy_string one level deeper is in temp too -----------
-    ts := context.temporary_storage;
-    lo := ts.data;
-    hi := ts.data + ts.size;
     in_temp :: (p: *void, lo: *u8, hi: *u8) -> bool {
         b := cast(*u8) p;
         return b >= lo && b < hi;
     }
+    ts := context.temporary_storage;
+    lo := ts.data;
+    hi := ts.data + ts.size;
     assert(in_temp(named_rows.data,         lo, hi), "the ARRAY came from temp");
     assert(in_temp(named_rows[0].name.data, lo, hi), "the STRING came from temp too");
     assert(!in_temp(heap_rows[0].name.data, lo, hi), "control: the no-,, string did not");
@@ -103,6 +103,22 @@ main :: () {
     ctx := second_arena_context();
     push_context ctx {
         assert(context.temporary_storage == *second_arena.base);
+
+        // `temp` IS LATE-BOUND -- it names a TIER, not an arena.
+        //   temp :: Allocator.{temporary_allocator_proc, null};     (Basic/module.jai)
+        // `data` is null, and the proc reads context.temporary_storage at ALLOCATION
+        // time, so the SAME `temp` symbol resolves to whichever arena is current. That
+        // is why a callee writing `x.allocator = temp` does NOT sever the caller's
+        // chain: it fixes the tier and inherits the arena. An allocator with non-null
+        // `data` is the one that carries an identity the caller did not choose.
+        inner_rows: [..] Row;
+        fill(*inner_rows ,, temp);
+        ilo := second_arena.data;
+        ihi := second_arena.data + second_arena.size;
+        assert(in_temp(inner_rows.data,         ilo, ihi), "same `temp`, INNER arena");
+        assert(in_temp(inner_rows[0].name.data, ilo, ihi), "...strings too");
+        assert(!in_temp(kept.data, ilo, ihi), "control: the outer rows are NOT in here");
+
         for frame: 0..4 {
             junk := tprint("frame % scratch", frame);
             assert(junk.count > 0);
