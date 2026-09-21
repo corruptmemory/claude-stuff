@@ -5,7 +5,8 @@
 //   confirmation against the beta 0.2.030 compiler (2026-09-20).
 // Proves (cheatsheet): Special Syntax > scopes and nested blocks
 // Use-cases: what creates a scope, what surprisingly does NOT, shadowing in a nested
-//   block, and the implicit scopes that exist without braces.
+//   block, the implicit scopes that exist without braces, and the load-bearing case —
+//   an IMPORT, which a bare block scopes and a `#if` does not.
 //
 // A bare `{ }` in Jai is a REAL SCOPE, not cosmetic grouping. That makes nested blocks
 // a tool rather than decoration: they bound a name's lifetime, let you reuse a name for
@@ -35,6 +36,34 @@
 //     Under a scope model those two are identical — both would be scopes, neither would
 //     collide. Under a splice model the false branch inserts NOTHING, so there is
 //     nothing to collide with. Observed: the splice behaviour.
+//
+//     The SHARPEST demonstration is an IMPORT, and it is sharp precisely because Jai
+//     scopes imports like any other declaration — these are NOT C #includes. The same
+//     line is confined by a bare block and escapes a `#if` (all three run below or are
+//     quoted from the compiler, beta 0.2.030):
+//
+//         #if true { using Math :: #import "Math"; }   Vector3 usable OUTSIDE   -> (A)
+//         { using Math :: #import "Math"; }            Vector3 outside ->
+//                                              "Error: Undeclared identifier 'Vector3'."
+//         { using Math :: #import "Math"; ...inside }  compiles and runs        -> (C)
+//
+//     (C) is what closes the argument. The block form does not fail because a
+//     block-local import is ILLEGAL — it fails because the import is SCOPED. So `#if`
+//     declining to scope it is a real semantic, not an artefact of imports needing to
+//     sit at file scope.
+//
+//     This is load-bearing in real code. A compile-time backend facade is written
+//     exactly this way, and cannot be written any other way:
+//
+//         using Shared :: #import "Render/Shared";
+//         #if GFX_BACKEND == .VULKAN { using Backend :: #import "Render/Vulkan"; }
+//         else                       { using Backend :: #import "Render/None";  }
+//
+//     If `#if` opened a scope, the chosen backend would be trapped inside its branch,
+//     the module would re-export nothing, and the pattern could not exist. Observed in
+//     the wild: screen-killer's modules/Render/module.jai, where that IS the whole
+//     facade — no hand-written forwarders, because a forwarder is a second place for
+//     two backends to drift apart.
 //
 //   - the braces of a struct literal, `Vector3.{1, 2, 3}`. They echo C's syntax; no
 //     declaration is legal inside one anyway.
@@ -93,6 +122,27 @@ main :: () {
     #if false { x := 10; }
     assert(x == 5, "a false #if spliced nothing; x is untouched and undisturbed");
 
+    // ...and #if does not scope an IMPORT either — the case that matters in real code,
+    // and one that is only MEANINGFUL because Jai does scope imports (see C).
+    #if true {
+        using Math :: #import "Math";
+    }
+    spliced := Vector3.{1, 2, 3};          // (A) resolves: the import was spliced HERE
+    assert(spliced.x == 1, "a #if-spliced import is visible in the ENCLOSING scope");
+
+    // (B) the same two lines with a bare block do NOT compile, so they stay quoted:
+    //         { using Math :: #import "Math"; }
+    //         v := Vector3.{1, 2, 3};
+    //     -> Error: Undeclared identifier 'Vector3'.
+    //
+    // (C) yet the import is perfectly legal INSIDE that block — which is what proves
+    // (B) is a SCOPING result and not "imports are illegal in an imperative scope":
+    {
+        using Block_Math :: #import "Math";
+        inside := Vector3.{4, 5, 6};
+        assert(inside.y == 5, "a block-local import is legal, and scoped to its block");
+    }
+
     // Nested blocks let one name mean different things in sequence without inventing
     // x_pixels / x_logical / x_tmp. Each is dead at its block's closing brace.
     SAME_NAME_DIFFERENT_TYPE :: "a string this time, same name, different type";
@@ -109,5 +159,5 @@ main :: () {
 
     print("PASS: scopes (bare blocks are real scopes and shadow; if/for/while bodies and\n");
     print("  every case arm are scopes with or without braces; #if and struct-literal\n");
-    print("  braces are NOT scopes)\n");
+    print("  braces are NOT scopes — including for IMPORTS, which a bare block DOES scope)\n");
 }

@@ -701,6 +701,18 @@ for 0..size-1 #no_abc #no_aoc {        // no array bounds check, no auto output 
 //     The discriminating test (a scope model predicts these match; they don't):
 //         #if true  { x := 10; }  with an outer x -> "Error: Redeclaration of 'x'."
 //         #if false { x := 10; }  with an outer x -> compiles clean, nothing spliced
+//     SHARPEST FORM -- an IMPORT, which matters because Jai DOES scope imports
+//     (they are not C #includes), so this is a real semantic and not vacuous:
+//         #if true { using Math :: #import "Math"; }  Vector3 usable OUTSIDE  -> OK
+//         { using Math :: #import "Math"; }           Vector3 outside ->
+//                                            "Error: Undeclared identifier 'Vector3'."
+//         { using Math :: #import "Math"; ..inside }  compiles + runs        -> OK
+//     The third is what proves the second: the block form fails by SCOPING, not
+//     because a block-local import is illegal. This is what makes a compile-time
+//     backend facade possible at all -- `#if GFX == .VULKAN { using B :: #import
+//     "R/Vulkan"; } else { using B :: #import "R/None"; }` re-exports the chosen
+//     backend from MODULE scope, with no hand-written forwarders. Were #if a scope,
+//     the import would be trapped in its branch and the pattern could not exist.
 //   `Vector3.{1, 2, 3}`   -> struct-literal braces echo C; no declaration is legal
 //                            inside one anyway.
 // Data vs imperative scope (how_to/080_scopes.jai): a data scope (file top level, a
@@ -773,6 +785,14 @@ using Sound :: #import "Sound_Player"(VERBOSE = false); // using + import with p
 // Source: modules/Window_Creation/android.jai, modules/Sound_Player/examples/
 
 // NOTE: #foreign_import does NOT exist. Use #library for foreign libraries.
+
+// IMPORTS ARE LEXICALLY SCOPED -- they are NOT C #includes (beta 0.2.030;
+// compendium/36). An import inside a bare { } block is legal and CONFINED to it:
+//     { using Math :: #import "Math"; v := Vector3.{1,2,3}; }   // fine INSIDE
+//     v := Vector3.{1,2,3};              // outside -> Undeclared identifier 'Vector3'
+// The same line inside `#if` escapes into the enclosing scope, because #if splices
+// rather than scoping -- which is exactly how compile-time backend facades are built.
+// See "SCOPES" under Other for the full three-way discriminating test.
 ```
 
 #### Named vs Anonymous Import Semantics

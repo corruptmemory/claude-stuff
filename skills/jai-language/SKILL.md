@@ -48,9 +48,10 @@ How to record it:
 
 Recorded this way so far, all beta 0.2.030: `compendium/34` (argument mutability —
 scalars are assignable, aggregates are not, and `x := x` is rejected), `compendium/35`
-(defer ordering and scope), `compendium/36` (scopes — a bare `{ }` is a real scope; `#if`
-and struct-literal braces are not), and `compendium/37` (array-to-slice conversion — a
-`*[..]T` satisfies a `*[]T` parameter, a `*[N]T` does not).
+(defer ordering and scope), `compendium/36` (scopes — a bare `{ }` is a real scope;
+`#if` and struct-literal braces are not, **including for imports**, which a bare block
+DOES scope while a `#if` splices them into the enclosing scope), and `compendium/37`
+(array-to-slice conversion — a `*[..]T` satisfies a `*[]T` parameter, a `*[N]T` does not).
 
 **A worked example of why step 2 says "and RUNS":** `compendium/36`'s first draft
 compiled clean and failed an assert at runtime, because a hand-counted string length was
