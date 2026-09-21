@@ -965,6 +965,30 @@ artifacts, or check invariants as part of the build rather than as separate step
 //   -very_debug          more debugging facilities, slower, catches more
 //   -natvis              natvis-compatible type names in debug info (array<T> not [] T)
 //   -debugger            drop into the interactive debugger on a COMPILE-TIME crash
+//
+// ── ORDINARY (non-generated) Jai in gdb (beta 0.2.030; verified live 2026-09-20) ──
+// The entry above is about generated code because that is the surprising half. Plain Jai
+// is addressed exactly like C, with two Jai-specific details worth knowing before you
+// guess at names:
+//   * The IMPLICIT CONTEXT is a real DWARF parameter on every non-#c_call proc, so every
+//     Jai frame reads `name (context=..., <your params>)`:
+//         #0  set_2d_origin (context=..., offset=...) at .../getrect_support.jai:404
+//         #1  draw_export   (context=...)             at .../src/tools/export_test.jai:69
+//   * MODULE-SCOPE GLOBALS are readable by BARE IDENTIFIER even in a `#scope_module`
+//     module, with no module prefix: `print ui_2d_origin` / `printf "%f", frame_extent.width`.
+//     Struct members and Math types work too (`$1 = (Math::Vector2 &) @0x35ed20: {x = 0, ...}`).
+//   * A PROCEDURE-VALUED PARAMETER prints as its symbol: `draw=0x326380 <draw_export>`,
+//     which is how you confirm a callback is the one you think it is.
+//   * `break <basename>.jai:<line>` and `break <proc_name>` both resolve; no mangling.
+//   Nothing here needed -no_inline or -debug_for -- those are for stepping INTO inlined
+//   callees and for_expansion bodies, not for breaking on ordinary procs.
+//
+// ⚠ A gdb (not Jai) trap that silently eats a scripted session: a STEPPING command
+//   (next/step/finish) inside a breakpoint `commands` block TERMINATES the command list.
+//   The classic "print, next, print" before/after pattern therefore runs the first print
+//   and then stops -- no error, no second print, and no `continue`, so the program just
+//   sits there. Express before/after as TWO breakpoints (one on the assignment, one on
+//   the caller's next line) and keep `continue` as the last command in every block.
 
 // ── BUILD-TIME PLUGINS: `+Name`, not `-flag` (beta 0.2.030; verified live 2026-09-20) ─
 // A plugin is a MODULE the compiler loads into the build to observe and rewrite the

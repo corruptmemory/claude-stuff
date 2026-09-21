@@ -155,6 +155,13 @@ re-verification RECIPE instead of a compile, or they rot silently. Recorded so f
 - **`for_expansion` macros need `-debug_for` to be steppable** (beta 0.2.030, 2026-09-20).
   Re-verify: break on a `for` over a type with a `for_expansion`, `step`, and confirm it
   skips the macro body by default and enters it when built with `-debug_for`.
+- **Ordinary Jai is addressable in gdb, and the implicit context is a real parameter**
+  (beta 0.2.030, 2026-09-20). Re-verify: `break <basename>.jai:<line>` on any proc in a
+  `#scope_module` module, `run`, then `bt` (every Jai frame reads `name (context=..., ...)`)
+  and `print <a module-scope global by bare name>`. Needs neither `-no_inline` nor
+  `-debug_for`. Recorded alongside it, because it cost a wasted run: a stepping command
+  inside a gdb `commands` block ends the block, so scripted before/after probes need two
+  breakpoints, not print-next-print.
 
 **Still unverified here** (no self-contained example ships): `#cpp_method` /
 `#cpp_return_type_is_non_pod` — only used inside platform module bindings (`modules/d3d11`,
