@@ -99,6 +99,17 @@ whichever the current context points at; and — the trap that cost a wasted con
 **`high_water_mark` is ZEROED by `reset_temporary_storage`**, so sampling it after a loop reports
 0 and reads as "the feature does nothing".
 
+A **twelfth** extended an existing entry rather than adding one, which the rule prefers:
+`compendium/37_array_to_slice.jai` now also proves the OWNERSHIP half of the two array
+types — `[] T` is `Array_View_64` {count, data} and owns nothing, while `[..] T` is
+`Resizable_Array` {count, data, allocated, **allocator**}, and `array_free` has a separate
+overload for each (`free(data)` vs `free(data,, array.allocator)`). Proven with a counting
+allocator, so the claim about WHICH allocator ran is observable. The consequence is the
+useful part: a struct field that is owned and freed, in a struct that crosses scopes, must
+be `[..]`; typed `[]` it is a type-level lie the compiler cannot catch, and its free
+silently uses whatever `context.allocator` is current at the free site. Found by shipping
+exactly that bug in screen-killer's `Captured_Image`.
+
 **A worked example of why step 2 says "and RUNS":** `compendium/36`'s first draft
 compiled clean and failed an assert at runtime, because a hand-counted string length was
 wrong. Compiling proves the signatures; only running proves the claim.

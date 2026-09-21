@@ -24,6 +24,29 @@
 // fixed array is bare storage with no count field at all, so there is nothing for a
 // *[] T to point AT; the count exists only in the type.
 //
+// THE OWNERSHIP HALF, added 2026-09-22 after it caused a real bug: the difference
+// between the two types is not only the count/capacity, it is WHO OWNS THE MEMORY.
+//
+//   [] T   -> Array_View_64   { count, data }                         a VIEW: owns nothing
+//   [..] T -> Resizable_Array { count, data, allocated, ALLOCATOR }   OWNS: remembers where
+//
+// The standard library draws the same line a second time, in two overloads:
+//
+//   array_free :: inline (array: [] $T)  { free(array.data); }                   <- view
+//   array_free :: (array: [..] $T)       { free(array.data,, array.allocator); } <- owner
+//
+// So a struct field that is OWNED and FREED, and whose struct can cross scopes, must be
+// `[..]`. Declaring it `[]` is a TYPE-LEVEL LIE the compiler cannot catch — both types
+// index and iterate identically — and it silently routes the free into the view overload,
+// which uses whatever `context.allocator` is current AT THE FREE SITE rather than the one
+// that allocated. That forecloses `,,` on the whole path: allocate with `,, temp`, free
+// under the default context, and a temp pointer goes to the heap allocator.
+//
+// The general rule: anything that COULD be built in one scope and freed in another has to
+// carry the allocator that built it. A construct whose every lifetime is syntactically
+// scoped can keep the cleanup in the scope instead; generalize when you need to. `[..]` is
+// ubiquitous and escapes constantly, so it pays that freight for everyone.
+//
 // THE PRACTICAL CONSEQUENCE, which is what made this worth recording: reading
 //     pop :: (array: *[] $T) -> T           (modules/Basic/Array.jai:232)
 // and concluding "pop does not work on a [..]" is WRONG. It does. `pop(*my_dynamic)`
@@ -37,6 +60,32 @@ sum_slice :: (s: [] int) -> int {
     total := 0;
     for s  total += it;
     return total;
+}
+
+// A counting allocator: the only way to observe WHICH allocator a free went to.
+Alloc_Counts :: struct { acquires: int; frees: int; }
+
+counting_allocator_proc :: (mode: Allocator_Mode, requested_size: s64, old_size: s64,
+                            old_memory: *void, allocator_data: *void) -> *void {
+    d := cast(*Alloc_Counts) allocator_data;
+    if #complete mode == {
+      case .ALLOCATE;  d.acquires += 1;  return alloc(requested_size ,, context.default_allocator);
+      case .RESIZE;
+        // array_resize on a [..] grows through RESIZE, not ALLOCATE -- a counter that
+        // watched only ALLOCATE would read zero and look like the allocator never ran.
+        d.acquires += 1;
+        return realloc(old_memory, requested_size, old_size ,, context.default_allocator);
+      case .FREE;      d.frees += 1;  free(old_memory ,, context.default_allocator);  return null;
+      case .STARTUP;      #through;
+      case .SHUTDOWN;     #through;
+      case .THREAD_START; #through;
+      case .THREAD_STOP;  #through;
+      case .CREATE_HEAP;  #through;
+      case .DESTROY_HEAP; #through;
+      case .IS_THIS_YOURS; #through;
+      case .CAPS;
+        return null;
+    }
 }
 
 main :: () {
@@ -69,7 +118,41 @@ main :: () {
     view: [] int = dyn;
     assert(view.count == 2 && view.data == dyn.data, "a []T view shares the storage");
 
+    // ── OWNERSHIP: a [..] REMEMBERS its allocator; a [] cannot ──────────────────
+    // Proven with a counting allocator, because the claim is about WHICH allocator runs,
+    // and that is invisible from the outside otherwise.
+    counts: Alloc_Counts;
+    counting := Allocator.{ counting_allocator_proc, *counts };
+
+    owned: [..] u8;
+    {
+        c := context;
+        c.allocator = counting;
+        push_context c {
+            array_resize(*owned, 64);   // grows via RESIZE, not ALLOCATE
+        }
+    }
+    assert(counts.acquires == 1,                              "the counting allocator produced it");
+    assert(owned.allocator.proc == counting_allocator_proc,   "the [..] RECORDS its allocator");
+
+    // Freed from the ORDINARY context: the ambient allocator is not the counting one.
+    assert(counts.frees == 0);
+    array_free(owned);                                        // picks the [..] overload
+    assert(counts.frees == 1, "array_free used the ARRAY's allocator, not the context's");
+
+    // And the lie: assigning the [..] to a [] drops the allocator on the floor. A []
+    // has nowhere to keep it, which is exactly why an owned buffer must not be one.
+    keeper: [..] u8;
+    array_resize(*keeper, 8);
+    lost: [] u8 = keeper;
+    assert(lost.count == keeper.count && lost.data == keeper.data, "the view sees the bytes");
+    assert(size_of(type_of(lost)) < size_of(type_of(keeper)),
+           "a [] is SMALLER than a [..] -- the missing bytes are allocated+allocator");
+    array_free(keeper);
+
     print("PASS: array-to-slice ([N]T and [..]T convert by value; *[..]T converts by\n");
+    print("  OWNERSHIP: a [..] records its allocator and array_free uses it; a [] cannot,\n");
+    print("  so an owned buffer typed [] frees through the ambient allocator instead.\n");
     print("  pointer so slice-taking mutators like pop() accept a dynamic array; *[N]T\n");
     print("  does not, because a fixed array has no count field to point at)\n");
 }

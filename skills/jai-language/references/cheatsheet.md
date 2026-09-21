@@ -1825,6 +1825,24 @@ time, so the same `temp` symbol resolves to whichever arena is current. A callee
 `x.allocator = temp` therefore does NOT sever its caller's chain — it fixes the tier and
 inherits the arena.
 
+**Jai encodes OWNERSHIP in the two array types — so an owned buffer typed `[] T` is a
+type-level lie.** <!-- compile-verified: beta 0.2.030 | compendium/37 -->
+```jai
+[] T   -> Array_View_64   { count, data }                        // a VIEW: owns nothing
+[..] T -> Resizable_Array { count, data, allocated, allocator }  // OWNS: remembers where
+
+array_free :: inline (array: [] $T)  { free(array.data); }                   // view overload
+array_free :: (array: [..] $T)       { free(array.data,, array.allocator); } // owner overload
+```
+A struct field that is owned and freed, in a struct that can cross scopes, must be `[..]`.
+Declared `[]`, its free takes the VIEW overload and goes through whatever
+`context.allocator` is current at the FREE site — which forecloses `,,` on the whole path
+and is invisible to the compiler, because both types index and iterate identically.
+**The general rule:** anything that could be built in one scope and freed in another has to
+carry the allocator that built it; a construct whose every lifetime is syntactically scoped
+can keep the cleanup in that scope instead. Generalize when you need to — `[..]` is
+ubiquitous and escapes constantly, so it pays that freight for everyone.
+
 **The test is PROVENANCE, not shape: is the allocator reachable from `context`?** Null `data`
 is NOT the criterion. Three forms, and only the last is a mistake:
 
