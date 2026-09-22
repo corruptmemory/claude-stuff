@@ -80,12 +80,13 @@ The behavioral skills that tell Claude Code *when* to capture thoughts live in t
 # Clone it first if the machine doesn't have it yet.
 for pack in auto-capture claudeception panning-for-gold \
             research-synthesis competitive-analysis \
-            heavy-file-ingestion n-agentic-harnesses; do
+            heavy-file-ingestion n-agentic-harnesses weekly-signal-diff; do
     ln -s "$HOME/projects/open-brain/skills/$pack" "$HOME/.claude/skills/$pack"
 done
 ```
 
-`auto-capture` is the minimum viable install — it's the one that teaches Claude Code to write session-end decisions back to the brain without being asked. The other six are general workflow packs curated to daily knowledge work.
+`auto-capture` is the minimum viable install — it's the one that teaches Claude Code to write session-end decisions back to the brain without being asked. The other seven are general workflow packs curated to daily knowledge work
+(`weekly-signal-diff` joined the tracked set 2026-09-22; it had been linked on the desktop since April).
 
 ### Travel devices (laptop) — the LAN URL isn't valid away from home
 

@@ -69,3 +69,9 @@ sessions/
 
 # Backups
 backups/
+
+# Claude Code runtime state that appeared after the list above (2026-09-22): MCP discovery
+# verdicts, the security-warnings acknowledgement list, and the agent-sdk venv logs.
+security/
+state/
+security_warnings_state_*.json
