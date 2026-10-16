@@ -18,6 +18,17 @@ Scaffold a new Go web project following a proven single-binary architecture with
 python3 scripts/scaffold.py <project-name> --module <module-path> --dir <output-directory>
 ```
 
+## The build.sh Recipe: Parse Flags, Then Run Linearly
+
+Every project's `build.sh` follows one recipe (Jim's; reference implementation `~/bhf/data-management-service/build.sh`):
+
+1. **Parsing only records.** The argument loop sets `DO_*` variables and nothing else. It never builds, tests or downloads. Arguments that take the rest of the command line (`--test [go test args…]`, `--run [app args…]`) are captured into arrays and end the loop.
+2. **Implied steps are flags too.** After parsing, one short block switches on what the requested steps need (`--develop` needs `--build`; a build with no generated templates needs `--generate`). A step function never calls another step's function.
+3. **The steps run once each, in one fixed order**: clean → vendor refresh → generate → vet/test → build → package → long-running (`--develop` or `--run`, which never returns, always last). The order the user types flags in does not matter, and flags whose work overlaps never repeat a step.
+4. **Preconditions of a late step are checked early.** If a late step needs a tool (docker, air, curl), check it before the slow steps run, so a host that cannot finish fails in seconds.
+
+The generated `build.sh` follows this recipe; keep it that way as flags are added. Details and a skeleton are in the architecture reference.
+
 ## Architecture Reference
 
 See [references/architecture.md](references/architecture.md) for the complete conventions: directory layout, build.sh structure, config pattern, route wiring, template structure, asset embedding, and CSS design tokens.

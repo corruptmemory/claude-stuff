@@ -81,7 +81,54 @@ HTMX_VERSION="${HTMX_VERSION:-2.0.7}"
 HTMX_URL="https://unpkg.com/htmx.org@${HTMX_VERSION}/dist/htmx.min.js"
 ```
 
-Build auto-generates templ if no `*_templ.go` files exist.
+Build auto-generates templ if no `*_templ.go` files exist (an implied flag, below, not a call from the build step).
+
+### Parse flags, then run linearly
+
+The argument loop only records what was asked for; the steps then run once each in one fixed order. Flags whose work overlaps (`-b -D`, `-g -b`) never repeat a step, and the order the user types flags in never matters. Reference implementation: `~/bhf/data-management-service/build.sh`.
+
+```bash
+# --- Parse: record what was asked for; run nothing. ---
+DO_CLEAN=false DO_GENERATE=false DO_TEST=false DO_BUILD=false DO_DEVELOP=false DO_RUN=false
+RUN_ARGS=()
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    -c|--clean)    DO_CLEAN=true ;;
+    -g|--generate) DO_GENERATE=true ;;
+    -t|--test)     DO_TEST=true ;;
+    -b|--build)    DO_BUILD=true ;;
+    -D|--develop)  DO_DEVELOP=true ;;
+    -r|--run)      DO_RUN=true; shift; RUN_ARGS=("$@"); break ;; # the rest goes to the app
+    -h|--help)     usage; exit 0 ;;
+    *) echo "ERROR: unknown argument: $1" >&2; usage; exit 1 ;;
+  esac
+  shift
+done
+
+# --- Implied steps: a step switches on what it needs; no step calls another. ---
+if [[ "$DO_DEVELOP" == true ]]; then DO_BUILD=true; fi
+if [[ "$DO_BUILD" == true || "$DO_TEST" == true || "$DO_RUN" == true ]] && ! has_generated_templates; then
+  DO_GENERATE=true
+fi
+if [[ "$DO_DEVELOP" == true && "$DO_RUN" == true ]]; then
+  echo "ERROR: --develop and --run both run the app; pick one" >&2; exit 1
+fi
+
+# --- Run: each requested step once, in this order. ---
+if [[ "$DO_CLEAN" == true ]]; then run_clean; fi
+if [[ "$DO_GENERATE" == true ]]; then run_generate; fi
+if [[ "$DO_TEST" == true ]]; then run_tests; fi
+if [[ "$DO_BUILD" == true ]]; then run_build; fi
+if [[ "$DO_DEVELOP" == true ]]; then run_develop; fi   # long-running: last
+if [[ "$DO_RUN" == true ]]; then run_app "${RUN_ARGS[@]}"; fi
+```
+
+Rules:
+- A new flag gets a `DO_*` variable, a `case` line, a step function, and one line in the run section at its place in the order. If it needs another step, add a line to the implied-steps block; never call that step's function from its own.
+- Tests run before the build, so a failure stops the run before the slow steps.
+- Anything that never returns (`air`, `exec` of the binary) is last, and only one of them may be requested.
+- If a late step needs a tool, check for it before the slow steps (a preflight line in the run section, ahead of generate and build).
+- Arguments that belong to another program (`go test` flags, the app's own flags) come last on the command line and are captured into an array during parsing.
 
 ## Config Pattern
 

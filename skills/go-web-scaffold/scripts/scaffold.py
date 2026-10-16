@@ -640,9 +640,15 @@ def build_sh(name):
           -D, --develop    Build once, then run air
           -g, --generate   Run templ code generation
           -b, --build      Build the app binary
-          -r, --run        Run the app
+          -r, --run [ARGS] Run the app; everything after --run goes to it, so it must be last
           -t, --test       Run Go tests
           -c, --clean      Remove build artifacts
+
+        Flags only record what to do. The steps then run once each in one fixed
+        order, whatever order the flags are given in: clean, refresh, generate,
+        test, build, then --develop or --run (one of them; they do not return).
+        A step switches on what it needs: --develop builds first, and a build,
+        test or run with no generated templates generates first.
 
         Examples:
           ./build.sh --refresh-htmx --refresh-normalize
@@ -682,10 +688,6 @@ def build_sh(name):
           ensure_go
           local bin_path
           bin_path="$(resolve_bin_path)"
-          if ! has_generated_templates; then
-            echo "==> No generated templ files found; running generate first"
-            run_generate
-          fi
           mkdir -p "$BIN_DIR"
           echo "==> Building static binary $bin_path"
           (cd "$ROOT_DIR" && CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o "$bin_path" ./cmd/app)
@@ -693,20 +695,12 @@ def build_sh(name):
 
         function run_app() {{
           ensure_go
-          if ! has_generated_templates; then
-            echo "==> No generated templ files found; running generate first"
-            run_generate
-          fi
           echo "==> Running app on http://localhost:8080"
-          (cd "$ROOT_DIR" && go run ./cmd/app)
+          (cd "$ROOT_DIR" && go run ./cmd/app "$@")
         }}
 
         function run_tests() {{
           ensure_go
-          if ! has_generated_templates; then
-            echo "==> No generated templ files found; running generate first"
-            run_generate
-          fi
           echo "==> Running tests"
           (cd "$ROOT_DIR" && go test ./...)
         }}
@@ -745,12 +739,12 @@ def build_sh(name):
           printf '%s/app%s' "$BIN_DIR" "$goexe"
         }}
 
+        # run_develop runs air, which never returns. The build it needs is an
+        # implied step (DO_BUILD), and air itself is found or installed by the
+        # preflight before any slow step (AIR_CMD).
         function run_develop() {{
-          local air_cmd
-          air_cmd="$(ensure_air | tail -n 1)"
-          run_build
-          echo "==> Starting air with $air_cmd"
-          (cd "$ROOT_DIR" && CGO_ENABLED=0 "$air_cmd")
+          echo "==> Starting air with $AIR_CMD"
+          (cd "$ROOT_DIR" && CGO_ENABLED=0 "$AIR_CMD")
         }}
 
         function run_refresh_htmx() {{
@@ -769,6 +763,7 @@ def build_sh(name):
           printf '%s\\n' "$NORMALIZE_VERSION" > "$NORMALIZE_VERSION_FILE"
         }}
 
+        # --- Parse: record what was asked for; run nothing. ---
         DO_REFRESH_NORMALIZE=false
         DO_REFRESH_HTMX=false
         DO_DEVELOP=false
@@ -777,6 +772,8 @@ def build_sh(name):
         DO_RUN=false
         DO_TEST=false
         DO_CLEAN=false
+        RUN_ARGS=()
+        AIR_CMD=""
 
         if [[ $# -eq 0 ]]; then
           usage
@@ -812,6 +809,8 @@ def build_sh(name):
             -r|--run)
               DO_RUN=true
               shift
+              RUN_ARGS=("$@") # the rest of the command line goes to the app
+              break
               ;;
             -t|--test)
               DO_TEST=true
@@ -830,6 +829,26 @@ def build_sh(name):
           esac
         done
 
+        # --- Implied steps: a step switches on what it needs; no step calls another. ---
+        if [[ "$DO_DEVELOP" == "true" ]]; then
+          DO_BUILD=true
+        fi
+        if [[ "$DO_BUILD" == "true" || "$DO_TEST" == "true" || "$DO_RUN" == "true" ]] && ! has_generated_templates; then
+          echo "==> No generated templ files found; generating first"
+          DO_GENERATE=true
+        fi
+        if [[ "$DO_DEVELOP" == "true" && "$DO_RUN" == "true" ]]; then
+          echo "ERROR: --develop and --run both run the app and do not return; pick one"
+          exit 1
+        fi
+
+        # --- Run: each requested step once, in this order. ---
+        # Preflight: find or install air before any slow step, so a host that
+        # cannot develop fails first.
+        if [[ "$DO_DEVELOP" == "true" ]]; then
+          AIR_CMD="$(ensure_air | tail -n 1)"
+        fi
+
         if [[ "$DO_CLEAN" == "true" ]]; then
           run_clean
         fi
@@ -846,20 +865,22 @@ def build_sh(name):
           run_generate
         fi
 
-        if [[ "$DO_BUILD" == "true" ]]; then
-          run_build
-        fi
-
-        if [[ "$DO_DEVELOP" == "true" ]]; then
-          run_develop
-        fi
-
+        # Tests before the build: a failure stops the run before the slow steps.
         if [[ "$DO_TEST" == "true" ]]; then
           run_tests
         fi
 
+        if [[ "$DO_BUILD" == "true" ]]; then
+          run_build
+        fi
+
+        # Last: these run the app and do not return.
+        if [[ "$DO_DEVELOP" == "true" ]]; then
+          run_develop
+        fi
+
         if [[ "$DO_RUN" == "true" ]]; then
-          run_app
+          run_app "${{RUN_ARGS[@]}}"
         fi
         """)
 
