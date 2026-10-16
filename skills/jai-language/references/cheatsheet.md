@@ -823,6 +823,15 @@ result := ifx cond  a;                         // without 'then' keyword
 result := ifx cond then { compute(); } else { other(); };
 result := #ifx cond then a else b;     // compile-time ifx
 ```
+**Typing trap (beta 0.2.030, proven in compendium/03):** when BOTH branches are untyped integer
+literals the ifx is `s64`, whatever the declared target, even for `ifx true`:
+`a: u16 = ifx f then 413 else 400;` → `Error: Number signedness mismatch. Type wanted: u16; type
+given: s64.` (an `s32` target gets `Loss of information (trying to fit 64 bits into 32 bits)`).
+Type one branch (`ifx f then cast(u16) 413 else 400` — the other literal follows) or `xx` the ifx.
+
+**`while true` is not treated as non-terminating (beta 0.2.030, compendium/03):** a procedure whose
+only `return`s are inside a `while true` loop warns `Not all control paths return a value.` — add a
+trailing unreachable `return`.
 
 ## Directives
 <!-- compile-verified: beta 0.2.030 | compendium/07, 28, 29, 31 -->
@@ -1432,6 +1441,37 @@ my_macro2 :: (row: *$T, override_code: Code = #code .[]) #expand {
 // NOTE: #system_library is deprecated in favor of #library,system (CHANGELOG beta 0.2.019)
 // Source: examples/dll/main.jai (#library,no_static_library)
 // Source: modules/Default_Allocator/module.jai (#library,system,no_dll)
+// VERIFIED LIVE (beta 0.2.030, 2026-10-16, regenerating the Vulkan bindings for
+// ~/projects/understaning-graphic-apis): three toolchain facts the corpus cannot assert.
+//   1. `-import_dir <dir>` SHADOWS the distribution's modules/: a local <dir>/Vulkan/ won
+//      over ~/jai/jai/modules/Vulkan/ for `#import "Vulkan"` (proven by a constant that only
+//      the local copy defines). BUT a RELATIVE <dir> is resolved against the MAIN SOURCE
+//      FILE's directory, not the cwd: from the repo root, `jai modules/Vulkan/smoke.jai
+//      -import_dir modules` silently used the DISTRIBUTION module (modules/Vulkan/modules/
+//      does not exist), while `-import_dir ..` from that file, or an absolute path, used the
+//      local one. The same rule puts the OUTPUT BINARY and `.build/` next to the main source
+//      file, not in the cwd. Pass absolute import dirs from scripts. Re-verify: build with a
+//      same-named local module and a relative vs absolute -import_dir; reference a symbol
+//      only the local module has.
+//      Related (verified by the branch reviewer, same day): the compiler sets a #run
+//      metaprogram's CWD to the main file's directory, so a first.jai run from any shell
+//      directory sees relative paths against the repo root, as do the programs it launches.
+//   2. Bindings_Generator RENAMES a C struct member whose name collides with a Jai type by
+//      prefixing an underscore: VkClearColorValue's `float32` came out as `_float32` (the
+//      compile error says "'float32' is not a member"). Expect the same for any member named
+//      like a builtin type.
+//   3. `abs` is NOT in Basic — it lives in Math (`Error: Undeclared identifier 'abs'` with only
+//      Basic imported). Same family: min/max/clamp ARE in Basic.
+//   4. METAPROGRAM OUTPUT IS LOST ON exit(). Inside a #run build program the compiler
+//      BUFFERS the metaprogram's stdout (print, write_string, plain log) and flushes it only
+//      when the #run returns and the compile completes; calling exit(N) — ANY N, even 0 —
+//      or compiler_report(...) discards everything buffered so far, so "print usage; exit(1)"
+//      prints NOTHING. log_error goes to stderr immediately and survives. The working
+//      pattern for a failing verb: print what you like, then
+//      `compiler_set_workspace_status(.FAILED);` and RETURN — exit code 1, output kept.
+//      Verified with six scratch probes on beta 0.2.030, 2026-10-16.
+//   5. compiler_get_base_path() returns the install dir WITHOUT a trailing slash
+//      ("/home/jim/jai/jai"), unlike #filepath, which ends in "/". Build "%/bin/jai-linux".
 #foreign lib_handle                    // foreign function from library
 #program_export                        // export procedure to executable
 #program_export "entry"                // export with custom name
@@ -1493,6 +1533,15 @@ my_macro2 :: (row: *$T, override_code: Code = #code .[]) #expand {
 GetRect bundles several types through one indicator struct — `Type_Indicator.Texture`, `.Font`, `.Window_Type` (module.jai:90–104) — same mechanism, multiple injected types via member access on the indicator.
 
 A layered split (GetRect↔Simp; or an optional router built on a core) is wired by the **main program**, not the library — the library can't set the param. Main imports the core with the layer's type (`#import "core"()(Handler_Data = router.Router)`) while the layer imports the core **bare**. Better still, the library can accept the injected type **structurally** instead of by exact identity: a compile-time `type_info` predicate (or a `$T/R` restriction, see Procedures) testing *"param type is `R`, or a struct embedding `R` via `#as using`"* lets a consumer pass **their own** struct that `#as using`-embeds the indicator (see Structs). They reclaim the single program-wide slot for their own state yet still get the layer's behavior — all cast-free, since `#as` makes `*Their_Struct` implicitly convert to `*R`. (`#if` needs a constant, so wrap the predicate call in `#run`; for an unwired/incompatible type, `#run Compiler.compiler_report("...")` in the `else` arm gives a clean, custom error — no `#assert` boilerplate.) Worked, self-verifying example: `compendium/22_open_ended_type_params.jai`.
+
+**A library's BARE import is its own, DEFAULT instance (beta 0.2.030, 2026-10-03; proven in
+compendium/30 via `lib_module/`).** If main does `#import "M"(X=3)` and a library main also uses
+does `#import "M";`, the library gets `X`'s **default** in a separate instantiation, not main's 3.
+Group 2 is inherited (it is program-wide). So a group-1 override in main splits the program into
+two copies of `M`, and any `M` type crossing between main and the library fails with an error that
+names the same type twice: `Type mismatch ... Type wanted: *Request (http.jai:7); type given:
+*Request (http.jai:7).` Rule: tunables that a program using such a library must be able to set
+belong in **group 2**. (Found in jai-http, where `http_router` imports `http_server` bare.)
 
 ## Operators
 <!-- compile-verified: beta 0.2.030 | compendium/08 -->

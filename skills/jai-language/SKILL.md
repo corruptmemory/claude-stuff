@@ -210,6 +210,13 @@ re-verification RECIPE instead of a compile, or they rot silently. Recorded so f
   `-debug_for`. Recorded alongside it, because it cost a wasted run: a stepping command
   inside a gdb `commands` block ends the block, so scripted before/after probes need two
   breakpoints, not print-next-print.
+- **`jai-linux -version` prints NOTHING unless stdout is a terminal** (beta 0.2.030,
+  2026-10-03). Piped or captured (`jai-linux -version | head`, `$(jai-linux -version)`, an
+  agent's Bash tool), it exits **0** with empty output, which reads as "no compiler" or "the
+  flag is wrong". A script that checks the version must give it a pseudo-terminal.
+  Re-verify: `~/jai/jai/bin/jai-linux -version | cat` prints nothing, while
+  `script -qc '~/jai/jai/bin/jai-linux -version' /dev/null` prints
+  `Version: beta 0.2.030, built on 2 July 2026.`
 
 **Still unverified here** (no self-contained example ships): `#cpp_method` /
 `#cpp_return_type_is_non_pod` — only used inside platform module bindings (`modules/d3d11`,

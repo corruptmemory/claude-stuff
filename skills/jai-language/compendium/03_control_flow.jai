@@ -8,7 +8,8 @@
 //   backtick bindings, range iteration, reverse/pointer, ifx, push_context,
 //   conditional for-modifiers (for <=cond / for *=cond), named for-expansion
 //   (for :name), labeled continue, #through fallthrough, #ifx (compile-time
-//   ifx), braced defer, backtick `defer inside #expand macros
+//   ifx), braced defer, backtick `defer inside #expand macros, ifx literal-branch typing
+//   (s64, not the target type), `while true` and the return-path warning
 
 #import "Basic";
 
@@ -93,6 +94,19 @@ demo_backtick_defer :: () {
 
 // Compile-time constant driving the #ifx demonstrations below.
 BUILD_IS_DEBUG :: true;
+
+// --- while true and the return-path check (beta 0.2.030, 2026-10-03) ---
+// The compiler does NOT treat `while true` as non-terminating. A procedure whose only returns are
+// inside such a loop compiles with
+//     Warning: Not all control paths return a value.
+// so a trailing (unreachable) return is needed to keep a build warning-free.
+first_over_three :: (n: int) -> int {
+    while true {
+        if n > 3  return n;
+        n += 1;
+    }
+    return -1;   // unreachable; without it: "Warning: Not all control paths return a value."
+}
 
 main :: () {
     // If/else
@@ -252,6 +266,26 @@ main :: () {
 
     // Backtick `defer inside an #expand macro (fires in the caller's scope).
     demo_backtick_defer();
+
+    // --- ifx with integer-literal branches is typed s64 (beta 0.2.030, 2026-10-03) ---
+    // When BOTH branches are untyped integer literals, the ifx is s64 regardless of the declared
+    // target type, even with a constant condition (`ifx true ...`):
+    //     a: u16 = ifx flag then 413 else 400;
+    //       Error: Number signedness mismatch. Type wanted: u16; type given: s64.
+    //     a: s32 = ifx flag then 413 else 400;
+    //       Error: Loss of information (trying to fit 64 bits into 32 bits). Can't do this
+    //       without an explicit cast. Type wanted: s32; type given: s64.
+    // A plain literal assignment (`a: u16 = 413;`) adopts the target type; ifx does not pass the
+    // target type down. Fix: type ONE branch (the other literal follows it), or `xx` the ifx.
+    flag := seconds_since_init() >= 0;           // runtime condition
+    s_one: u16 = ifx flag then cast(u16) 413 else 400;
+    typed: u16 = 7;
+    s_var: u16 = ifx flag then typed else 400;
+    s_xx:  u16 = xx ifx flag then 413 else 400;
+    assert(s_one == 413 && s_var == 7 && s_xx == 413);
+    assert(type_of(s_one) == u16);
+    assert(first_over_three(1) == 4);
+    print("ifx literal typing + while-true return path: ok\n");
 
     print("PASS: control flow (extended: for <=cond / *=cond, for :name, labeled continue, #through, #ifx, braced defer, backtick `defer)\n");
 }

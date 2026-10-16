@@ -26,6 +26,7 @@
 // argument list is a separate copy of the module. Group 2 cannot vary this way — it is
 // program-wide, set once (above), and these inherit it without asking.
 Two   :: #import "param_module"(SCALE=2);
+Lib   :: #import "lib_module";   // a library that imports param_module BARE (see lib_module/module.jai)
 Three :: #import "param_module"(SCALE=3);
 
 main :: () {
@@ -73,6 +74,20 @@ main :: () {
     // (Jai's other route to this same surprise: a module imported by two different literal
     // path strings is two instances, so `../modules/X` and `../../modules/X` also produce
     // non-unifying types. Import a shared module by ONE spelling everywhere.)
+
+    // --- A LIBRARY'S BARE IMPORT IS A SEPARATE, DEFAULT INSTANCE (beta 0.2.030, 2026-10-03) ---
+    // lib_module does `#import "param_module";` with no arguments. It does NOT pick up the
+    // SCALE=3 this main program passed: it gets the group-1 DEFAULT, in its own instantiation.
+    // Group 2 is different: it is program-wide, so the library inherits Elem=float.
+    assert(Lib.lib_scale() == 2, "library sees the group-1 default, not main's SCALE=3");
+    assert(Lib.lib_scale_value(1.5) == 3.0, "library inherits group-2 Elem=float");
+    // Consequence (found in jai-http, where http_router imports http_server bare): a group-1
+    // override in main splits the program into two instances, and any value crossing between
+    // main and the library fails to type-check with an error naming the same type twice:
+    //     Error: Type mismatch between the arguments when comparing two procedures.
+    //     Type wanted: *Request (.../http.jai:7); type given: *Request (.../http.jai:7).
+    // Rule: a tunable that a program using such a library must be able to set belongs in
+    // GROUP 2, which main sets once and every importer inherits.
 
     print("PASS: group-1 SCALE=% (per-import value), group-2 Elem=% (program-wide type) -> scale_value(1.5)=%\n",
           get_scale(), type_of(r), r);
