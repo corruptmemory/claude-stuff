@@ -75,3 +75,6 @@ backups/
 security/
 state/
 security_warnings_state_*.json
+
+# Claude Code daemon log (appeared 2026-10): runtime noise beside the already-ignored daemon/ dir
+daemon.log
