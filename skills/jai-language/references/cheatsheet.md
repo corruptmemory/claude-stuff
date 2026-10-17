@@ -1832,7 +1832,7 @@ tprint("%", FormatFloat.{value = 3.14, trailing_width = 2});  // "3.14" (struct-
 ```
 
 ## Context System
-<!-- compile-verified: beta 0.2.030 | compendium/16, 21, 29, 40 -->
+<!-- compile-verified: beta 0.2.030 | compendium/16, 21, 29, 40, 41 -->
 
 Every Jai procedure receives an implicit `context` parameter containing:
 - Allocator (default and temporary)
@@ -1938,6 +1938,47 @@ temp storage does. **Measurement trap:** `high_water_mark` is ZEROED by
 `reset_temporary_storage` (same file, :167), so sampling it after a loop reports 0 and a
 control built on it reads as "the feature does nothing". Sample `total_bytes_occupied`
 mid-frame instead.
+
+### Init regions: temp by default, a `Preserved_Values` struct for what must survive
+<!-- compile-verified: beta 0.2.030 | compendium/41 -->
+
+C-API setup (Vulkan, D3D) is one protocol repeated: get a count, allocate that many, get the
+data, keep a little, drop the rest. The C habit is a `defer free(buf.data)` per buffer. In Jai
+the whole of init is one memory REGION, and only the kept values cross out of it:
+
+```jai
+Preserved_Values :: struct {
+    allocator:   Allocator;      // owns every heap field below: whoever frees knows how
+    device_name: string;
+}
+#add_context preserved_values: *Preserved_Values;   // null outside the region
+
+save_device_name :: (name: *u8, length: s64) {       // no "where does it go" parameter:
+    pv := context.preserved_values;                  // the context says where
+    pv.device_name = copy_string(to_string(name, length),, pv.allocator);
+}
+
+vulkan_init :: (pv: *Preserved_Values) {
+    ctx := context;
+    ctx.allocator         = temp;               // the region's DEFAULT allocator...
+    ctx.temporary_storage = *init_arena.base;   // ...in a dedicated arena (optional), so
+    ctx.preserved_values  = pv;                 //    the caller's frame temp is untouched
+    push_context ctx {
+        count: u32;
+        enumerate(*count, null);
+        props := NewArray(count, Props);        // scratch: no defer, no free, ever
+        enumerate(*count, props.data);
+        // ...pick, and call save_device_name(...) for what must survive...
+        reset_temporary_storage();              // the region dies here, all at once
+    }
+}
+```
+Three allocators, three lifetimes, and the entry counts all three: the ambient allocator is
+never called during init, the preserved one is called exactly once per kept value, and the
+arena is reset and scribbled over without the kept values noticing. Context is dynamic, so a
+saver called from any depth inside the region finds the pointer; outside it the field is null.
+Without the dedicated arena, `temp` is the program's own: reset it after init, or let the frame
+reset take it. Teardown mirrors the struct: `free(pv.device_name,, pv.allocator)`.
 
 ### Context handoff across thread / non-Jai boundaries
 

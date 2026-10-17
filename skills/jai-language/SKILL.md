@@ -14,7 +14,7 @@ The Jai compiler distribution at `~/jai/jai/` contains the authoritative source:
 
 See [references/cheatsheet.md](references/cheatsheet.md) for the full language cheat sheet.
 See [compendium/](compendium/) for compilable code samples demonstrating every language feature
-(40 entries: 38 single `.jai` files + two subdirectory entries, `30_module_parameters/` and
+(41 entries: 39 single `.jai` files + two subdirectory entries, `30_module_parameters/` and
 `38_arithmetic_overflow_check/`).
 See [references/build-variables-recipe.md](references/build-variables-recipe.md) for the canonical
 metaprogram recipe for custom compile-time build variables (`#placeholder` knobs module +
@@ -109,6 +109,15 @@ useful part: a struct field that is owned and freed, in a struct that crosses sc
 be `[..]`; typed `[]` it is a type-level lie the compiler cannot catch, and its free
 silently uses whatever `context.allocator` is current at the free site. Found by shipping
 exactly that bug in screen-killer's `Captured_Image`.
+
+A **thirteenth** landed 2026-10-17, and it records a PATTERN rather than a surprise:
+`compendium/41_init_region_and_preserved_values.jai` proves the Jai shape for C-API setup
+(Vulkan's count-then-fill enumerations, and anything like them) -- init runs under a pushed
+context whose default allocator is `temp`, pointed at its own arena, while the few values that
+must outlive init are copied through ONE allocator carried by a `Preserved_Values` struct that
+`#add_context` makes reachable as `context.preserved_values`, so savers need no destination
+parameter and no buffer needs a `defer free`. Three counting allocators pin the three lifetimes.
+Suggested by Jim while reading the Vulkan lessons, whose sample code still carries the C habit.
 
 **A worked example of why step 2 says "and RUNS":** `compendium/36`'s first draft
 compiled clean and failed an assert at runtime, because a hand-counted string length was
